@@ -44,13 +44,51 @@ class MatMultLayer : public Layer<Dtype> {
   // Compute height_out_ and width_out_ from other parameters.
 //  virtual void compute_output_shape() = 0;
 
+ private:
   /// @brief The spatial dimensions of the first input.
   vector<int> a_shape_;
   /// @brief The spatial dimensions of the second input.
   vector<int> b_shape_;
-  /// @brief The spatial dimensions of the output.
-  vector<int> c_shape_;
+
+  int N_M_;
+  int A_offset_;
+  int B_offset_;
+  int C_offset_;
+  int D_1_;
+  int D_2_;
+  int D_3_;
+  bool A_is_diag_;
+  bool B_is_diag_;
+};
+
+/**
+ * @brief MatInvLayer. Compute A = (A + \lambda I)^{-1}.
+ */
+template <typename Dtype>
+class MatInvLayer : public Layer<Dtype> {
+ public:
+  explicit MatInvLayer(const LayerParameter& param)
+      : Layer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual inline int MinBottomBlobs() const { return 1; }
+  virtual inline int MinTopBlobs() const { return 1; }
+
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
  private:
+  Dtype lambda;
+  vector<int> input_shape_;
 };
 }  // namespace caffe
 
