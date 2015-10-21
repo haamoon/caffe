@@ -86,9 +86,16 @@ class MatInvLayer : public Layer<Dtype> {
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
   virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  /// @brief The spatial dimensions of the col_buffer.
+  vector<int> tmp_buffer_shape_;
+ 
  private:
-  Dtype lambda;
+  Dtype lambda_;
   vector<int> input_shape_;
+  int N_;
+  int dim_;
+  int offset_;
+  Blob<Dtype> tmp_buffer_; 
 };
 }  // namespace caffe
 
