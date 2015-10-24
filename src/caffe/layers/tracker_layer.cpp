@@ -109,7 +109,7 @@ namespace caffe {
         output_concat_layer.add_top("o");
         output_concat_layer.mutable_concat_param()->set_axis(0);
         
-        for (int t = 1; t <= this->T_; ++t) {
+ /*       for (int t = 1; t <= this->T_; ++t) {
             string tm1s = this->int_to_str(t - 1);
             string ts = this->int_to_str(t);
             
@@ -175,7 +175,7 @@ namespace caffe {
             output_concat_layer.add_bottom("o_" + ts);
         }  // for (int t = 1; t <= this->T_; ++t)
         
-        net_param->add_layer()->CopyFrom(output_concat_layer);
+        net_param->add_layer()->CopyFrom(output_concat_layer);*/
     }
     
     INSTANTIATE_CLASS(TrackerLayer);
