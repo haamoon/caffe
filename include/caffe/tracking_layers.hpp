@@ -12,6 +12,7 @@
 #include "caffe/layer.hpp"
 #include "caffe/loss_layers.hpp"
 #include "caffe/neuron_layers.hpp"
+#include "caffe/sequence_layers.hpp"
 #include "caffe/proto/caffe.pb.h"
 
 namespace caffe {
@@ -100,6 +101,52 @@ class MatInvLayer : public Layer<Dtype> {
   int offset_;
   Blob<Dtype> tmp_buffer_; 
 };
+
+template <typename Dtype>
+class SwitchLayer : public Layer<Dtype> {
+ public:
+
+  explicit SwitchLayer(const LayerParameter& param)
+      : Layer<Dtype>(param) {}
+
+  virtual inline const char* type() const { return "Switch"; }
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+ protected:
+
+  virtual inline int ExactNumBottomBlobs() const { return 2; }
+  virtual inline int ExactNumTopBlobs() const { return 1; }
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+  const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  private:
+  int D_1_;
+  int D_2_;
+  int input_offset_;
+  int N_;
+};
+
+template <typename Dtype>
+    class TrackerLayer : public RecurrentLayer<Dtype> {
+  public:
+    explicit TrackerLayer(const LayerParameter& param)
+        : RecurrentLayer<Dtype>(param) {}
+        
+    virtual inline const char* type() const { return "Tracker"; }
+        
+  protected:
+    virtual void FillUnrolledNet(NetParameter* net_param) const;
+    virtual void RecurrentInputBlobNames(vector<string>* names) const;
+    virtual void RecurrentOutputBlobNames(vector<string>* names) const;
+    virtual void RecurrentInputShapes(vector<BlobShape>* shapes) const;
+    virtual void OutputBlobNames(vector<string>* names) const;
+};
+
 }  // namespace caffe
 
 #endif  // CAFFE_TRACKING_LAYERS_HPP_

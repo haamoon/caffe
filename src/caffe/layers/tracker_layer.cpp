@@ -7,6 +7,7 @@
 #include "caffe/layer.hpp"
 #include "caffe/sequence_layers.hpp"
 #include "caffe/util/math_functions.hpp"
+#include "caffe/tracking_layers.hpp"
 
 namespace caffe {
     
@@ -27,27 +28,26 @@ namespace caffe {
     template <typename Dtype>
     void TrackerLayer<Dtype>::RecurrentInputShapes(vector<BlobShape>* shapes) const {
 
+        const int feature_dim = this->layer_param_.tracker_param().feature_dim(); 
+        CHECK_GT(feature_dim, 0) << "feature_dim must be positive.";
         
-        //Assume that FillUnrolledNet is called before and feature_dim_ is initialized there
-        CHECK_GT(feature_dim_, 0) << "feature_dim_ must be positive.";
-        
-        const int num_track = layer_param_.tracker_param().num_track();
-        CHECK_GT(num_output, 0) << "num_track must be positive";
+        const int num_track = this->layer_param_.tracker_param().num_track();
+        CHECK_GT(num_track, 0) << "num_track must be positive";
         
         shapes->resize(2);
         //C_t is a d x num_track matrix
         (*shapes)[0].Clear();
         (*shapes)[0].add_dim(1);  // a single timestep
         (*shapes)[0].add_dim(this->N_);
-        (*shapes)[0].add_dim(feature_dim_);
+        (*shapes)[0].add_dim(feature_dim);
         (*shapes)[0].add_dim(num_track);
         
         //H_t is a dxd matrix
         (*shapes)[1].Clear();
         (*shapes)[1].add_dim(1);  // a single timestep
         (*shapes)[1].add_dim(this->N_);
-        (*shapes)[1].add_dim(feature_dim_);
-        (*shapes)[1].add_dim(feature_dim_);
+        (*shapes)[1].add_dim(feature_dim);
+        (*shapes)[1].add_dim(feature_dim);
     }
     
     template <typename Dtype>
@@ -62,7 +62,7 @@ namespace caffe {
         // Add generic LayerParameter's (without bottoms/tops) of layer types we'll
         // use to save redundant code.
         LayerParameter matmult_param;
-        hidden_param.set_type("MatMult");
+        matmult_param.set_type("MatMult");
         
         
         LayerParameter sum_param;
@@ -74,12 +74,15 @@ namespace caffe {
         slice_param.set_type("Slice");
         slice_param.mutable_slice_param()->set_axis(0);
         
+        //TODO: currently feature_dim_ can not be set because this
+        //fucntion is defined as constant. So, I set it mannually
+        //in proto.
         //initialize feature_dim_ before calling RecurrentInputShapes
         //x input is a T_ x N_ x num_seg x feature_dim_ array
-        CHECK_GE(net_param->input_size(), 1);
-        CHECK_EQ(net_param->intput(0).compare("x"), 0);
-        BlobShape& input_blob_shape = net_param->input_shape(0);
-        feature_dim_ = input_blob_shape.dim(input_blob_shape.dim_size() - 1);
+        //CHECK_GE(net_param->input_size(), 1);
+        //CHECK_EQ(net_param->input(0).compare("x"), 0);
+        //const BlobShape input_blob_shape = net_param->input_shape(0);
+        //feature_dim_ = input_blob_shape.dim(input_blob_shape.dim_size() - 1);
         
         vector<BlobShape> input_shapes;
         RecurrentInputShapes(&input_shapes);
@@ -113,7 +116,7 @@ namespace caffe {
             cont_slice_param->add_top("cont_" + ts);
             x_slice_param->add_top("x_" + ts);
             
-            // Add layer to flush the hidden state when beginning a new sequence,
+            // Add layer to flush the V'_{t} when beginning a new sequence,
             // as indicated by cont_t.
             //     h_conted_{t-1} := cont_t * h_{t-1}
             //
@@ -128,32 +131,15 @@ namespace caffe {
                 cont_h_param->add_bottom("cont_" + ts);
                 cont_h_param->add_top("h_conted_" + tm1s);
             }
-            
-            // Add layer to compute
-            //     W_hh_h_{t-1} := W_hh * h_conted_{t-1}
-            {
-                LayerParameter* w_param = net_param->add_layer();
-                w_param->CopyFrom(hidden_param);
-                w_param->set_name("W_hh_h_" + tm1s);
-                w_param->add_param()->set_name("W_hh");
-                w_param->add_bottom("h_conted_" + tm1s);
-                w_param->add_top("W_hh_h_" + tm1s);
-                w_param->mutable_inner_product_param()->set_axis(2);
-            }
-            
+                        
             // Add layers to compute
-            //     h_t := \tanh( W_hh * h_conted_{t-1} + W_xh * x_t + b_h )
-            //          = \tanh( W_hh_h_{t-1} + W_xh_t )
+            //     hm1_{tm1s} := h_{tm1s}^{-1}
             {
-                LayerParameter* h_input_sum_param = net_param->add_layer();
-                h_input_sum_param->CopyFrom(sum_param);
-                h_input_sum_param->set_name("h_input_sum_" + ts);
-                h_input_sum_param->add_bottom("W_hh_h_" + tm1s);
-                h_input_sum_param->add_bottom("W_xh_x_" + ts);
-                if (this->static_input_) {
-                    h_input_sum_param->add_bottom("W_xh_x_static");
-                }
-                h_input_sum_param->add_top("h_neuron_input_" + ts);
+                LayerParameter* hm1_param = net_param->add_layer();
+                hm1_param->set_type("MatInv");
+                hm1_param->set_name("hm1_" + tm1s);
+                hm1_param->add_bottom("h_" + tm1s);
+                hm1_param->add_top("hm1_" + tm1s);
             }
             {
                 LayerParameter* h_neuron_param = net_param->add_layer();

@@ -26,10 +26,14 @@ void MatInvLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
 template <typename Dtype>
 void MatInvLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
-	input_shape_ = bottom[0]->shape();
-	N_ = input_shape_[0];
-	dim_ = input_shape_[1];
-	CHECK_EQ(dim_, input_shape_[2]) << "Input should a be square matrix.";
+
+    input_shape_ = bottom[0]->shape();  
+    CHECK_GE(input_shape_.size(), 2);
+	int input_start_axis = input_shape_.size() - 2;
+		
+	N_ = bottom[0]->count(0, input_start_axis);
+	dim_ = input_shape_[input_start_axis];
+	CHECK_EQ(dim_, input_shape_[input_start_axis + 1]) << "Input should a be square matrix.";
 	
 	offset_ = dim_ * dim_;
 	
@@ -82,8 +86,7 @@ void MatInvLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
 }
 
 #ifdef CPU_ONLY
-STUB_GPU_FORWARD(MatInvLayer, Forward);
-STUB_GPU_BACKWARD(MatInvLayer, Backward);
+STUB_GPU(MatInvLayer);
 #endif
 
 
