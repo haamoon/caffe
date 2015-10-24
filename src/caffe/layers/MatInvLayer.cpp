@@ -18,8 +18,9 @@ namespace caffe {
 template <typename Dtype>
 void MatInvLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
-	//TODO: initialize lambda
-	lambda_ = .5;
+	// Set lambda value
+  	MatInvParameter matinv_param = this->layer_param_.matinv_param();
+	lambda_ = matinv_param.lambda();
 }
 
 template <typename Dtype>
@@ -52,6 +53,7 @@ void MatInvLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
 	caffe_copy(N_* offset_, input_data, output_data);
 	
 	for (int n = 0; n < N_; ++n) {
+		caffe_strided_add_scalar<Dtype>(offset_, lambda_, dim_ + 1, output_data + offset_ * n);
 		caffe_cpu_inverse<Dtype>(dim_, output_data + offset_ * n);
 	}
 }

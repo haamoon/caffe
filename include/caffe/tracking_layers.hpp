@@ -21,6 +21,7 @@ namespace caffe {
 template <typename Dtype>
 class MatMultLayer : public Layer<Dtype> {
  public:
+  virtual inline const char* type() const { return "MatMult"; }
   explicit MatMultLayer(const LayerParameter& param)
       : Layer<Dtype>(param) {}
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
@@ -67,6 +68,8 @@ class MatMultLayer : public Layer<Dtype> {
 template <typename Dtype>
 class MatInvLayer : public Layer<Dtype> {
  public:
+ virtual inline const char* type() const { return "MatInv"; }
+ 
   explicit MatInvLayer(const LayerParameter& param)
       : Layer<Dtype>(param) {}
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
@@ -90,7 +93,7 @@ class MatInvLayer : public Layer<Dtype> {
   vector<int> tmp_buffer_shape_;
  
  private:
-  Dtype lambda_;
+  float lambda_;
   vector<int> input_shape_;
   int N_;
   int dim_;

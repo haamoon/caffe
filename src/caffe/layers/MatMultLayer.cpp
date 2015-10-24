@@ -17,45 +17,61 @@ namespace caffe {
 template <typename Dtype>
 void MatMultLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
-
+    
+    // See if A or B are diagonal
+  	MatMultParameter matmult_param = this->layer_param_.matmult_param();
+	int field_size = matmult_param.diagonal_input_size();
+	A_is_diag_ = (field_size > 0 && matmult_param.diagonal_input(0));
+	B_is_diag_ = (field_size > 1 && matmult_param.diagonal_input(1));
+	
+	// Do not work if A is full and B is diagonal
+	CHECK(A_is_diag_ || !B_is_diag_) << "Full A times diagonal B is not supported.";
 }
 
 template <typename Dtype>
 void MatMultLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
+	
 	a_shape_ = bottom[0]->shape();
 	b_shape_ = bottom[1]->shape();
-	CHECK_GE(a_shape_.size(), 2);
-	CHECK_GE(b_shape_.size(), 2);
-
-	N_M_ = a_shape_[0];
-	CHECK_EQ(N_M_, b_shape_[0]) << "Num of Matrices should be the same";
 	
+	int a_start_axis = 0;
+	int b_start_axis = 0;
 	
-	D_1_ = a_shape_[1];
-	
-	A_is_diag_ = (a_shape_.size() == 2);
-	B_is_diag_ = (b_shape_.size() == 2);
-	
-	if(A_is_diag_) {
+	if(A_is_diag_) { 
+		CHECK_GE(a_shape_.size(), 1);
+		a_start_axis = a_shape_.size() - 1;
+		D_1_ = a_shape_[a_start_axis];
 		D_2_ = D_1_;
-		A_offset_ = D_1_;
+		A_offset_ = D_1_;	
 	} else {
-		D_2_ = a_shape_[2];
+		CHECK_GE(a_shape_.size(), 2);
+		a_start_axis = a_shape_.size() - 2;
+		D_1_ = a_shape_[a_start_axis];
+		D_2_ = a_shape_[a_start_axis + 1];
 		A_offset_ = D_1_ * D_2_;
 	}
-	CHECK_EQ(D_2_, b_shape_[1]) << "Matrices dimension do not match";
 	
-	if(B_is_diag_) {
+	if(B_is_diag_) { 
+		CHECK_GE(b_shape_.size(), 1);
+		b_start_axis = b_shape_.size() - 1;
+		CHECK_EQ(D_2_, b_shape_[b_start_axis]) << "Matrices dimension do not match";	
 		D_3_ = D_2_;
 		B_offset_ = D_2_;
 	} else {
-		D_3_ = b_shape_[2];
+		CHECK_GE(a_shape_.size(), 2);
+		b_start_axis = b_shape_.size() - 2;
+		CHECK_EQ(D_2_, b_shape_[b_start_axis]) << "Matrices dimension do not match";
+		D_3_ = b_shape_[b_start_axis + 1];
 		B_offset_ = D_2_ * D_3_;
 	}
 	
+	N_M_ = bottom[0]->count(0, a_start_axis);
+	CHECK_EQ(N_M_, bottom[1]->count(0, b_start_axis)) << "Num of Matrices should be the same";
+	
+	
 	vector<int> c_shape;
-	c_shape.push_back(N_M_);
+	c_shape.insert(c_shape.end(), a_shape_.begin(), a_shape_.begin() + a_start_axis); 
 	c_shape.push_back(D_1_);
 	
 	
@@ -134,7 +150,7 @@ void MatMultLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
 			for( int r = 0; r < D_1_; ++r) {
 				A_diff[A_offset_ * n + r] = caffe_cpu_dot(D_3_, C_diff + C_offset_ * n + 
 						D_3_ * r, B_data + B_offset_ * n + D_3_ * r);  
-				caffe_scal(D_1_, A_data[A_offset_ * n + r], B_diff + B_offset_ * n + D_3_ * r);
+				caffe_scal(D_3_, A_data[A_offset_ * n + r], B_diff + B_offset_ * n + D_3_ * r);
 			}			
 		}
 	} else if(!A_is_diag_ && B_is_diag_) {
