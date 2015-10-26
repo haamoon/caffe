@@ -29,9 +29,9 @@ class MatMultLayer : public Layer<Dtype> {
       const vector<Blob<Dtype>*>& top);
   virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
-
-  virtual inline int MinBottomBlobs() const { return 2; }
-  virtual inline int MinTopBlobs() const { return 1; }
+      
+  virtual inline int ExactNumBottomBlobs() const { return 2; }
+  virtual inline int ExactNumTopBlobs() const { return 1; }
 
  protected:
   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
@@ -61,6 +61,7 @@ class MatMultLayer : public Layer<Dtype> {
   int D_3_;
   bool A_is_diag_;
   bool B_is_diag_;
+  CBLAS_TRANSPOSE A_transpose_;
 };
 
 /**
@@ -78,9 +79,8 @@ class MatInvLayer : public Layer<Dtype> {
   virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
 
-  virtual inline int MinBottomBlobs() const { return 1; }
-  virtual inline int MinTopBlobs() const { return 1; }
-
+  virtual inline int ExactNumBottomBlobs() const { return 1; }
+  virtual inline int ExactNumTopBlobs() const { return 1; }
  protected:
   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);

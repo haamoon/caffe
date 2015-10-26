@@ -74,15 +74,20 @@ namespace caffe {
         slice_param.set_type("Slice");
         slice_param.mutable_slice_param()->set_axis(0);
         
+  		LayerParameter scalar_param;
+  		scalar_param.set_type("Scalar");
+  		scalar_param.mutable_scalar_param()->set_axis(0);
+  
+        
         //TODO: currently feature_dim_ can not be set because this
         //fucntion is defined as constant. So, I set it mannually
-        //in proto.
+        //in RecurrentInputShapes proto.
         //initialize feature_dim_ before calling RecurrentInputShapes
         //x input is a T_ x N_ x num_seg x feature_dim_ array
-        //CHECK_GE(net_param->input_size(), 1);
-        //CHECK_EQ(net_param->input(0).compare("x"), 0);
-        //const BlobShape input_blob_shape = net_param->input_shape(0);
-        //feature_dim_ = input_blob_shape.dim(input_blob_shape.dim_size() - 1);
+        CHECK_GE(net_param->input_size(), 1);
+        CHECK_EQ(net_param->input(0).compare("x"), 0);
+        const BlobShape input_blob_shape = net_param->input_shape(0); 
+        
         
         vector<BlobShape> input_shapes;
         RecurrentInputShapes(&input_shapes);
@@ -116,6 +121,50 @@ namespace caffe {
             cont_slice_param->add_top("cont_" + ts);
             x_slice_param->add_top("x_" + ts);
             
+            // Add layers to split x_{t} to xi_{t} i = 1,2,3,4
+            {
+            	LayerParameter* x_split_param = net_param->add_layer();
+                x_split_param->set_type("Split");
+                x_split_param->set_name("x_split_" + ts);
+                x_split_param->add_bottom("x_" + ts);
+                x_split_param->add_top("x1_" + ts);
+            	x_split_param->add_top("x2_" + ts);
+            	x_split_param->add_top("x3_" + ts);
+            	x_split_param->add_top("x4_" + ts);
+            }
+            
+            // Add layers to split cont_{t} to conti_{t} i = 1,2,3
+            {
+            	LayerParameter* v_split_param = net_param->add_layer();
+                v_split_param->set_type("Split");
+                v_split_param->set_name("cont_split_" + ts);
+                v_split_param->add_bottom("cont_" + ts);
+                v_split_param->add_top("cont1_" + ts);
+            	v_split_param->add_top("cont2_" + ts);
+            	v_split_param->add_top("cont3_" + ts);
+            }
+            
+            // Add layers to split h_{t-1} to h1_{t-1} h2_{t-1}
+            {
+            	LayerParameter* h_split_param = net_param->add_layer();
+                h_split_param->set_type("Split");
+                h_split_param->set_name("h_split_" + tm1s);
+                h_split_param->add_bottom("h_" + tm1s);
+                h_split_param->add_top("h1_" + tm1s);
+            	h_split_param->add_top("h2_" + tm1s);
+            }
+            
+            
+            // Add layers to split c_{t} to c1_{t} c2_{t}
+            {
+            	LayerParameter* c_split_param = net_param->add_layer();
+                c_split_param->set_type("Split");
+                c_split_param->set_name("c_split_" + tm1s);
+                c_split_param->add_bottom("c_" + tm1s);
+                c_split_param->add_top("c1_" + tm1s);
+            	c_split_param->add_top("c2_" + tm1s);
+            }
+            
             
             // Add layers to compute
             //     hm1_{t-1} := h_{t-1}^{-1}
@@ -123,7 +172,7 @@ namespace caffe {
                 LayerParameter* hm1_param = net_param->add_layer();
                 hm1_param->set_type("MatInv");
                 hm1_param->set_name("hm1_" + tm1s);
-                hm1_param->add_bottom("h_" + tm1s);
+                hm1_param->add_bottom("h1_" + tm1s);
                 hm1_param->add_top("hm1_" + tm1s);
             }
             
@@ -132,9 +181,9 @@ namespace caffe {
             {
                 LayerParameter* w_param = net_param->add_layer();
                 w_param->CopyFrom(matmult_param);
-                w_param->set_name("w_" + tsm);
+                w_param->set_name("w_" + tm1s);
                 w_param->add_bottom("hm1_" + tm1s);
-                w_param->add_bottom("c_" + tm1s)
+                w_param->add_bottom("c1_" + tm1s);
                 w_param->add_top("w_" + tm1s);
             }
             
@@ -156,23 +205,160 @@ namespace caffe {
                 v_cont_param->set_type("Switch");
                 v_cont_param->set_name("v_cont_" + ts);
                 v_cont_param->add_bottom("v_" + ts);
-                v_cont_param->add_bottom("cont_" + ts);
+                v_cont_param->add_bottom("cont1_" + ts);
                 v_cont_param->add_top("v_cont_" + ts);
             }
             
-            // Add layers to compute
-            //     m_{t} =
+            // Add layers to copy v_cont_{t} 3 times 
+            //     v1_{t}, v2_{t}, v3_{t},  
             {
-                LayerParameter* v_cont_param = net_param->add_layer();
-                v_cont_param->set_type("Switch");
-                v_cont_param->set_name("v_cont_" + ts);
-                v_cont_param->add_bottom("v_" + ts);
-                v_cont_param->add_bottom("cont_" + ts);
-                v_cont_param->add_top("v_cont_" + ts);
+                LayerParameter* v_split_param = net_param->add_layer();
+                v_split_param->set_type("Split");
+                v_split_param->set_name("v_split_" + ts);
+                v_split_param->add_bottom("v_cont_" + ts);
+                v_split_param->add_top("v1_" + ts);
+            	v_split_param->add_top("v2_" + ts);
+            	v_split_param->add_top("v3_" + ts);
             }
             
+            // Add layers to comput 
+            // 	m_{t} = \phi(v1_{t}) where \phi is 
+            //	row-wise max	  
+            {
             
-            output_concat_layer.add_bottom("v_cont_" + ts);
+            	//1) Reshape from 1 x _N x num_seg x num_track to _N x num_seg x num_track x 1
+            	LayerParameter* r1_param = net_param->add_layer();
+                r1_param->set_type("Reshape");
+                r1_param->set_name("reshape1_" + ts);
+                r1_param->add_bottom("v1_" + ts);
+                r1_param->add_top("vr_" + ts);
+                BlobShape* r1_top_blob_shape = r1_param->mutable_reshape_param()->mutable_shape();
+                //x input is a T_ x N_ x num_seg x feature_dim_ array
+        		const int num_track = this->layer_param_.tracker_param().num_track();
+                r1_top_blob_shape->add_dim(input_blob_shape.dim(1));
+                r1_top_blob_shape->add_dim(input_blob_shape.dim(2));
+                r1_top_blob_shape->add_dim(num_track);
+                r1_top_blob_shape->add_dim(1);
+                
+                
+                //2) Max pooling
+                LayerParameter* max_param = net_param->add_layer();
+                max_param->set_type("Pooling");
+                max_param->set_name("max_" + ts);
+                max_param->mutable_pooling_param()->set_pool(PoolingParameter_PoolMethod_MAX);
+                max_param->mutable_pooling_param()->set_kernel_h(num_track);
+                max_param->mutable_pooling_param()->set_kernel_w(1);
+                max_param->add_bottom("vr_" + ts);
+                max_param->add_top("mr_" + ts);
+                
+                
+                //3) Reshape from _N x num_seg x 1 x 1 to 1 x _N x num_seg
+                LayerParameter* r2_param = net_param->add_layer();
+                r2_param->set_type("Reshape");
+                r1_param->set_name("reshape2_" + ts);
+                r2_param->add_bottom("mr_" + ts);
+                r2_param->add_top("m_" + ts);
+                BlobShape* r2_top_blob_shape = r2_param->mutable_reshape_param()->mutable_shape();
+                r2_top_blob_shape->add_dim(1);
+                r2_top_blob_shape->add_dim(input_blob_shape.dim(1));
+                r2_top_blob_shape->add_dim(input_blob_shape.dim(2));
+            }
+            
+            // Add layers to split m_{t} to m1_{t} m2_{t}
+            {
+            	LayerParameter* m_split_param = net_param->add_layer();
+                m_split_param->set_type("Split");
+                m_split_param->set_name("m_split_" + ts);
+                m_split_param->add_bottom("m_" + ts);
+                m_split_param->add_top("m1_" + ts);
+            	m_split_param->add_top("m2_" + ts);
+            }
+            
+            // Add layers to comput 
+            // 	H_{t} =  cont{t} * H_{t-1} + X_{t}^\top (M_{t} X_{t})	  
+            {
+            	//1) MX_{t} = (M_{t} X_{t})	
+            	LayerParameter* mx_param = net_param->add_layer();
+                mx_param->CopyFrom(matmult_param);
+                mx_param->set_name("mx_" + ts);
+                MatMultParameter* mx_matmult_param = mx_param->mutable_matmult_param();
+  				mx_matmult_param->add_diagonal_input(true);
+                mx_param->add_bottom("m1_" + ts);
+                mx_param->add_bottom("x2_" + ts);
+                mx_param->add_top("mx_" + ts);	
+            
+            	//2) XMX_{t} = X_{t}^\top MX_{t}
+            	LayerParameter* xmx_param = net_param->add_layer();
+                xmx_param->CopyFrom(matmult_param);
+                MatMultParameter* xmx_matmult_param = xmx_param->mutable_matmult_param();
+                xmx_matmult_param->set_transpose_a(true);
+                xmx_param->set_name("xmx_" + ts);
+                xmx_param->add_bottom("x3_" + ts);
+                xmx_param->add_bottom("mx_" + ts);
+                xmx_param->add_top("xmx_" + ts);
+                
+                
+                //3) H_cont_{t-1} = cont{t} * H_{t-1}
+                LayerParameter* h_cont_param = net_param->add_layer();
+                h_cont_param->CopyFrom(scalar_param);
+                h_cont_param->set_name("h_cont_" + tm1s);
+                h_cont_param->add_bottom("h2_" + tm1s);
+                h_cont_param->add_bottom("cont2_" + ts);
+                h_cont_param->add_top("h_cont_" + tm1s);
+                
+                
+                //4) H_{t} = H_cont_{t-1} + XMX_{t}
+                LayerParameter* update_h_param = net_param->add_layer();
+      			update_h_param->CopyFrom(sum_param);
+      			update_h_param->set_name("h_" + ts);
+      			update_h_param->add_bottom("h_cont_" + tm1s);
+      			update_h_param->add_bottom("xmx_" + ts);
+      			update_h_param->add_top("h_" + ts);
+            }
+
+            // Add layers to comput 
+            // 	C_{t} =  cont{t} * C_{t-1} + X_{t}^\top (M_{t} V_{t})	  
+            {
+            	//1) MV_{t} = (M_{t} V_{t})	
+            	LayerParameter* mv_param = net_param->add_layer();
+                mv_param->CopyFrom(matmult_param);
+                mv_param->set_name("mv_" + ts);
+                MatMultParameter* mv_matmult_param = mv_param->mutable_matmult_param();
+  				mv_matmult_param->add_diagonal_input(true);
+                mv_param->add_bottom("m2_" + ts);
+                mv_param->add_bottom("v2_" + ts);
+                mv_param->add_top("mv_" + ts);	
+            
+            	//2) XMV_{t} = X_{t}^\top MV_{t}
+            	LayerParameter* xmv_param = net_param->add_layer();
+                xmv_param->CopyFrom(matmult_param);
+                MatMultParameter* xmv_matmult_param = xmv_param->mutable_matmult_param();
+                xmv_matmult_param->set_transpose_a(true);
+                xmv_param->set_name("xmv_" + ts);
+                xmv_param->add_bottom("x4_" + ts);
+                xmv_param->add_bottom("mv_" + ts);
+                xmv_param->add_top("xmv_" + ts);
+                
+                
+                //3) C_cont_{t-1} = cont{t} * C_{t-1}
+                LayerParameter* c_cont_param = net_param->add_layer();
+                c_cont_param->CopyFrom(scalar_param);
+                c_cont_param->set_name("c_cont_" + tm1s);
+                c_cont_param->add_bottom("c2_" + tm1s);
+                c_cont_param->add_bottom("cont3_" + ts);
+                c_cont_param->add_top("c_cont_" + tm1s);
+                
+                
+                //4) C_{t} = C_cont_{t-1} + XMV_{t}
+                LayerParameter* update_c_param = net_param->add_layer();
+      			update_c_param->CopyFrom(sum_param);
+      			update_c_param->set_name("c_" + ts);
+      			update_c_param->add_bottom("c_cont_" + tm1s);
+      			update_c_param->add_bottom("xmv_" + ts);
+      			update_c_param->add_top("c_" + ts);
+            }
+                        
+            output_concat_layer.add_bottom("v3_" + ts);
         }  // for (int t = 1; t <= this->T_; ++t)
         
         net_param->add_layer()->CopyFrom(output_concat_layer);
