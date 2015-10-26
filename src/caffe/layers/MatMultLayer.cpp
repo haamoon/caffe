@@ -24,8 +24,11 @@ void MatMultLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
 	A_is_diag_ = (field_size > 0 && matmult_param.diagonal_input(0));
 	B_is_diag_ = (field_size > 1 && matmult_param.diagonal_input(1));
 	
-	// Do not work if A is full and B is diagonal
+	// Does not work if A is full and B is diagonal
 	CHECK(A_is_diag_ || !B_is_diag_) << "Full A times diagonal B is not supported.";
+	
+	// See if we need to transpose A
+	A_transpose_ = matmult_param.transpose_a() ? CblasTrans : CblasNoTrans;
 }
 
 template <typename Dtype>
@@ -47,8 +50,13 @@ void MatMultLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
 	} else {
 		CHECK_GE(a_shape_.size(), 2);
 		a_start_axis = a_shape_.size() - 2;
-		D_1_ = a_shape_[a_start_axis];
-		D_2_ = a_shape_[a_start_axis + 1];
+		if(A_transpose_ == CblasTrans) {
+			D_1_ = a_shape_[a_start_axis + 1];
+			D_2_ = a_shape_[a_start_axis];
+		} else {
+			D_1_ = a_shape_[a_start_axis];
+			D_2_ = a_shape_[a_start_axis + 1];
+		}
 		A_offset_ = D_1_ * D_2_;
 	}
 	
@@ -95,7 +103,7 @@ void MatMultLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
 	//handle the case both A and B are full matrices: C = AB
 	if(!A_is_diag_ && !B_is_diag_) {
 		for (int n = 0; n < N_M_; ++n) {
-			caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, D_1_,
+			caffe_cpu_gemm<Dtype>(A_transpose_, CblasNoTrans, D_1_,
     	    	D_3_, D_2_,
     	    	(Dtype)1., A_data + A_offset_ * n, B_data + B_offset_ * n,
     	    	(Dtype)0., C_data + C_offset_ * n);		
@@ -132,17 +140,31 @@ void MatMultLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
 	//A' = C' B^\top
 	//B' = A^\top C'
 	if(!A_is_diag_ && !B_is_diag_) {
-		for (int n = 0; n < N_M_; ++n) {
-			caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasTrans, D_1_,
-        		D_2_, D_3_,
-        		(Dtype)1., C_diff + C_offset_ * n, B_data + B_offset_ * n,
-        		(Dtype)0., A_diff + A_offset_ * n);
+		if(A_transpose_ == CblasNoTrans) {
+			for (int n = 0; n < N_M_; ++n) {
+				caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasTrans, D_1_,
+		    		D_2_, D_3_,
+		    		(Dtype)1., C_diff + C_offset_ * n, B_data + B_offset_ * n,
+		    		(Dtype)0., A_diff + A_offset_ * n);
 
-			caffe_cpu_gemm<Dtype>(CblasTrans, CblasNoTrans, D_2_,
-        		D_3_, D_1_,
-        		(Dtype)1., A_data + A_offset_ * n, C_diff + C_offset_ * n,
-        		(Dtype)0., B_diff + B_offset_ * n);
-        }		
+				caffe_cpu_gemm<Dtype>(CblasTrans, CblasNoTrans, D_2_,
+		    		D_3_, D_1_,
+		    		(Dtype)1., A_data + A_offset_ * n, C_diff + C_offset_ * n,
+		    		(Dtype)0., B_diff + B_offset_ * n);
+		    }
+		} else {
+			for (int n = 0; n < N_M_; ++n) {
+				caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasTrans, D_2_,
+		    		D_1_, D_3_,
+		    		(Dtype)1., B_data + B_offset_ * n, C_diff + C_offset_ * n,
+		    		(Dtype)0., A_diff + A_offset_ * n);
+
+				caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, D_2_,
+		    		D_3_, D_1_,
+		    		(Dtype)1., A_data + A_offset_ * n, C_diff + C_offset_ * n,
+		    		(Dtype)0., B_diff + B_offset_ * n);
+		    }
+		}		
 	}
 	else if(A_is_diag_ && !B_is_diag_) {
 		caffe_copy(N_M_* C_offset_, C_diff, B_diff);

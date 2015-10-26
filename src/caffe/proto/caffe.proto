@@ -1013,6 +1013,10 @@ message TrackerParameter {
   
   // Input feature dimension.
   required int32 feature_dim = 2;
+  
+  
+  // Lambda value in the inversion
+  optional float lambda = 1 [default = .5];
 }
 
 

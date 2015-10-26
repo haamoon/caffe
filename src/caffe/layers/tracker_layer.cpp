@@ -35,14 +35,14 @@ namespace caffe {
         CHECK_GT(num_track, 0) << "num_track must be positive";
         
         shapes->resize(2);
-        //C_t is a d x num_track matrix
+        //C_t is a 1x N x d x num_track matrix
         (*shapes)[0].Clear();
         (*shapes)[0].add_dim(1);  // a single timestep
         (*shapes)[0].add_dim(this->N_);
         (*shapes)[0].add_dim(feature_dim);
         (*shapes)[0].add_dim(num_track);
         
-        //H_t is a dxd matrix
+        //H_t is a 1xNxdxd matrix
         (*shapes)[1].Clear();
         (*shapes)[1].add_dim(1);  // a single timestep
         (*shapes)[1].add_dim(this->N_);
@@ -171,6 +171,7 @@ namespace caffe {
             {
                 LayerParameter* hm1_param = net_param->add_layer();
                 hm1_param->set_type("MatInv");
+                hm1_param->mutable_matinv_param()->set_lambda(this->layer_param_.lambda());
                 hm1_param->set_name("hm1_" + tm1s);
                 hm1_param->add_bottom("h1_" + tm1s);
                 hm1_param->add_top("hm1_" + tm1s);
