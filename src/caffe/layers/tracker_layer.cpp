@@ -104,36 +104,21 @@ namespace caffe {
         x_slice_param->add_bottom("x");
         
         LayerParameter output_concat_layer;
-        output_concat_layer.set_name("o_concat");
+        output_concat_layer.set_name("v_concat");
         output_concat_layer.set_type("Concat");
-        output_concat_layer.add_top("o");
+        output_concat_layer.add_top("v");
         output_concat_layer.mutable_concat_param()->set_axis(0);
         
- /*       for (int t = 1; t <= this->T_; ++t) {
+        for (int t = 1; t <= this->T_; ++t) {
             string tm1s = this->int_to_str(t - 1);
             string ts = this->int_to_str(t);
             
             cont_slice_param->add_top("cont_" + ts);
             x_slice_param->add_top("x_" + ts);
             
-            // Add layer to flush the V'_{t} when beginning a new sequence,
-            // as indicated by cont_t.
-            //     h_conted_{t-1} := cont_t * h_{t-1}
-            //
-            // Normally, cont_t is binary (i.e., 0 or 1), so:
-            //     h_conted_{t-1} := h_{t-1} if cont_t == 1
-            //                       0   otherwise
-            {
-                LayerParameter* cont_h_param = net_param->add_layer();
-                cont_h_param->CopyFrom(scalar_param);
-                cont_h_param->set_name("h_conted_" + tm1s);
-                cont_h_param->add_bottom("h_" + tm1s);
-                cont_h_param->add_bottom("cont_" + ts);
-                cont_h_param->add_top("h_conted_" + tm1s);
-            }
-                        
+            
             // Add layers to compute
-            //     hm1_{tm1s} := h_{tm1s}^{-1}
+            //     hm1_{t-1} := h_{t-1}^{-1}
             {
                 LayerParameter* hm1_param = net_param->add_layer();
                 hm1_param->set_type("MatInv");
@@ -141,41 +126,56 @@ namespace caffe {
                 hm1_param->add_bottom("h_" + tm1s);
                 hm1_param->add_top("hm1_" + tm1s);
             }
+            
+            // Add layers to compute
+            //     w_{t-1} := hm1_{t-1} c_{t-1}
             {
-                LayerParameter* h_neuron_param = net_param->add_layer();
-                h_neuron_param->CopyFrom(tanh_param);
-                h_neuron_param->set_name("h_neuron_" + ts);
-                h_neuron_param->add_bottom("h_neuron_input_" + ts);
-                h_neuron_param->add_top("h_" + ts);
+                LayerParameter* w_param = net_param->add_layer();
+                w_param->CopyFrom(matmult_param);
+                w_param->set_name("w_" + tsm);
+                w_param->add_bottom("hm1_" + tm1s);
+                w_param->add_bottom("c_" + tm1s)
+                w_param->add_top("w_" + tm1s);
             }
             
             // Add layer to compute
-            //     W_ho_h_t := W_ho * h_t + b_o
+            //     v_{t} = X_{t} w_{t-1}
             {
-                LayerParameter* w_param = net_param->add_layer();
-                w_param->CopyFrom(biased_hidden_param);
-                w_param->set_name("W_ho_h_" + ts);
-                w_param->add_param()->set_name("W_ho");
-                w_param->add_param()->set_name("b_o");
-                w_param->add_bottom("h_" + ts);
-                w_param->add_top("W_ho_h_" + ts);
-                w_param->mutable_inner_product_param()->set_axis(2);
+                LayerParameter* v_param = net_param->add_layer();
+                v_param->CopyFrom(matmult_param);
+                v_param->set_name("v_" + ts);
+                v_param->add_bottom("x_" + ts);
+                v_param->add_bottom("w_" + tm1s);
+                v_param->add_top("v_" + ts);
             }
             
             // Add layers to compute
-            //     o_t := \tanh( W_ho h_t + b_o)
-            //          = \tanh( W_ho_h_t )
+            //     v_cont_{t} = v_{t} * cont{t}
             {
-                LayerParameter* o_neuron_param = net_param->add_layer();
-                o_neuron_param->CopyFrom(tanh_param);
-                o_neuron_param->set_name("o_neuron_" + ts);
-                o_neuron_param->add_bottom("W_ho_h_" + ts);
-                o_neuron_param->add_top("o_" + ts);
+                LayerParameter* v_cont_param = net_param->add_layer();
+                v_cont_param->set_type("Switch");
+                v_cont_param->set_name("v_cont_" + ts);
+                v_cont_param->add_bottom("v_" + ts);
+                v_cont_param->add_bottom("cont_" + ts);
+                v_cont_param->add_top("v_cont_" + ts);
             }
-            output_concat_layer.add_bottom("o_" + ts);
+            
+            // Add layers to compute
+            //     m_{t} =
+            {
+                LayerParameter* v_cont_param = net_param->add_layer();
+                v_cont_param->set_type("Switch");
+                v_cont_param->set_name("v_cont_" + ts);
+                v_cont_param->add_bottom("v_" + ts);
+                v_cont_param->add_bottom("cont_" + ts);
+                v_cont_param->add_top("v_cont_" + ts);
+            }
+            
+            
+            output_concat_layer.add_bottom("v_cont_" + ts);
         }  // for (int t = 1; t <= this->T_; ++t)
         
-        net_param->add_layer()->CopyFrom(output_concat_layer);*/
+        net_param->add_layer()->CopyFrom(output_concat_layer);
     }
     
     INSTANTIATE_CLASS(TrackerLayer);
