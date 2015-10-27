@@ -19,9 +19,13 @@ class TrackerLayerTest : public MultiDeviceTest<TypeParam> {
 
  protected:
   TrackerLayerTest() {
-  	blob_bottom_a_ = NULL;
-  	blob_bottom_b_ = NULL;
-  	blob_top_ = NULL;
+  	x_ = NULL;
+  	cont_ = NULL;
+  	h_0_ = NULL;
+  	c_0_ = NULL;
+  	h_T_ = NULL;
+  	c_T_ = NULL;
+  	v_ = NULL;
   }
   
   void clear() {
@@ -65,15 +69,16 @@ class TrackerLayerTest : public MultiDeviceTest<TypeParam> {
     }
     
     blob_bottom_vec_.clear();
-    blob_top_vec_clear();
+    blob_top_vec_.clear();
   }
   
+  
   void setbottom(vector<int> x_shape, int num_track = 5, float lambda = .5) {
-
+	
 	TrackerParameter* tracker_param = layer_param_.mutable_tracker_param();
-  	tracker_param->add_lambda(lambda);
-	tracker_param->add_num_track(num_track);
-	tracker_param->add_feature_dim(x_shape[3]);
+  	tracker_param->set_lambda(lambda);
+	tracker_param->set_num_track(num_track);
+	tracker_param->set_feature_dim(x_shape[3]);
 	
 	this->num_track_ = num_track;
 	this->clear();
@@ -86,6 +91,10 @@ class TrackerLayerTest : public MultiDeviceTest<TypeParam> {
     
     //x_shape_: T x N x num_seg x num_dim
     x_shape_ = x_shape;
+    
+    //cont_shape_: T x N 
+    cont_shape_.push_back(x_shape_[0]);
+    cont_shape_.push_back(x_shape_[1]);
     
     //h_0_shape_: 1 x N x num_dim x num_dim
     h_0_shape_.push_back(1);
@@ -100,20 +109,32 @@ class TrackerLayerTest : public MultiDeviceTest<TypeParam> {
     c_0_shape_.push_back(num_track);
     
     x_ = new Blob<Dtype>(x_shape);
-    cont_ = new Blob<int>(x_shape);
-    h_0_ = new Blob<Dtype>(h_0_shape_);
-    c_0_ = new Blob<Dtype>(c_0_shape_);
-    h_T_ = new Blob<Dtype>();
-    c_T_ = new Blob<Dtype>();
+    cont_ = new Blob<Dtype>(cont_shape_);
+    //h_0_ = new Blob<Dtype>(h_0_shape_);
+    //c_0_ = new Blob<Dtype>(c_0_shape_);
+    //h_T_ = new Blob<Dtype>();
+    //c_T_ = new Blob<Dtype>();
     v_ = new Blob<Dtype>();
     
     filler.Fill(x_);
-    filler.Fill(c_0_);
-    filler.Fill(h_0_);
+    //filler.Fill(c_0_);
+    //filler.Fill(h_0_);
     
-    blob_bottom_vec_.push_back();
-    blob_bottom_vec_.push_back();
-    blob_bottom_vec_.push_back();
+    Dtype* cont_data = cont_->mutable_cpu_data();
+    for(int t = 0; t < x_shape_[0]; ++t) {
+    	for(int n = 0; n < x_shape_[1]; n++) {
+    		cont_data[ t * x_shape_[1] + n ] = (t == 0 
+    		//|| t == (x_shape_[0] - 1) / 2
+    		) ? (Dtype).0 : (Dtype)1.0;
+    	}
+    }
+    
+    blob_bottom_vec_.push_back(x_);
+    blob_bottom_vec_.push_back(cont_);
+    //blob_bottom_vec_.push_back(c_0_);
+	//blob_bottom_vec_.push_back(h_0_);
+	
+	blob_top_vec_.push_back(v_);
   }
   
   
@@ -121,6 +142,17 @@ class TrackerLayerTest : public MultiDeviceTest<TypeParam> {
   	this->clear();
   }
   
+  template <typename Dtype>
+  void printMat(std::stringstream& buffer, Dtype* mat, int col, int count) {
+	for (int i = 0; i < count; ++i) {
+  		if(i % col == 0) {
+  			buffer << ';' << endl;
+  		}
+		buffer << mat[i] << ' ';    
+  	}
+  		buffer << endl;
+  }
+
   Blob<Dtype>* x_;
   Blob<Dtype>* cont_;
   Blob<Dtype>* h_0_;
@@ -143,253 +175,69 @@ class TrackerLayerTest : public MultiDeviceTest<TypeParam> {
   LayerParameter layer_param_;
 };
 
+
 TYPED_TEST_CASE(TrackerLayerTest, TestDtypesAndDevices);
 
 
-TYPED_TEST(TrackerLayerTest, TestSetUpFTF) {
-  typedef typename TypeParam::Dtype Dtype;
-  
-  this->setbottom(false, false, true);    
-  TrackerLayer<Dtype> layer(this->layer_param_);
-
-  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
-  EXPECT_EQ(this->blob_top_->shape(0), 2);
-  EXPECT_EQ(this->blob_top_->shape(1), 3);
-  EXPECT_EQ(this->blob_top_->shape(2), 2);
+TYPED_TEST(TrackerLayerTest, TestSetUp) {
+ 	typedef typename TypeParam::Dtype Dtype;
+	vector<int> x_shape;
+	
+	int T = 10;
+	int N = 15;
+	int num_seg = 4;
+	int num_dim = 3;
+	int num_track = 5;
+	float lambda = .5;
+	
+	x_shape.push_back(T);
+	x_shape.push_back(N);
+	x_shape.push_back(num_seg);
+	x_shape.push_back(num_dim);
+	this->setbottom(x_shape, num_track, lambda);
+	
+	TrackerLayer<Dtype> tracker_layer(this->layer_param_);
+	
+	tracker_layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+  	
+  	//v has: T x N x num_seg x num_track
+  	EXPECT_EQ(this->v_->shape(0), T);
+  	EXPECT_EQ(this->v_->shape(1), N);
+  	EXPECT_EQ(this->v_->shape(2), num_seg);
+  	EXPECT_EQ(this->v_->shape(3), num_track);
 }
 
-TYPED_TEST(TrackerLayerTest, TestSetUpFF) {
-  typedef typename TypeParam::Dtype Dtype;
+TYPED_TEST(TrackerLayerTest, TestForwardT1) {
+ 	typedef typename TypeParam::Dtype Dtype;
+	vector<int> x_shape;
+	
+	int T = 3;
+	int N = 2;
+	int num_seg = 4;
+	int num_dim = 3;
+	int num_track = 5;
+	float lambda = .5;
+	
+	x_shape.push_back(T);
+	x_shape.push_back(N);
+	x_shape.push_back(num_seg);
+	x_shape.push_back(num_dim);
+	this->setbottom(x_shape, num_track, lambda);
+	
+	TrackerLayer<Dtype> tracker_layer(this->layer_param_);
+	
+	tracker_layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+  	
+  	tracker_layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
   
-  this->setbottom(false, false);    
-  TrackerLayer<Dtype> layer(this->layer_param_);
-
-  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
-  EXPECT_EQ(this->blob_top_->shape(0), 2);
-  EXPECT_EQ(this->blob_top_->shape(1), 3);
-  EXPECT_EQ(this->blob_top_->shape(2), 2);
+  	std::stringstream buffer;	
+  	buffer << "x: " << endl;
+  	this->printMat(buffer, this->x_->cpu_data(), num_dim, this->x_->count());
+  	buffer << "cont: " << endl;
+  	this->printMat(buffer, this->cont_->cpu_data(), N, this->cont_->count());
+  	buffer << "v: " << endl;
+  	this->printMat(buffer, this->v_->cpu_data(), num_track, this->v_->count());
+	LOG(ERROR) << buffer.str();
 }
 
-TYPED_TEST(TrackerLayerTest, TestSetUpDF) {
-  typedef typename TypeParam::Dtype Dtype;
-  
-  this->setbottom(true, false);    
-  TrackerLayer<Dtype> layer(this->layer_param_);
-
-  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
-  EXPECT_EQ(this->blob_top_->shape(0), 2);
-  EXPECT_EQ(this->blob_top_->shape(1), 4);
-  EXPECT_EQ(this->blob_top_->shape(2), 2);
-}
-
-
-TYPED_TEST(TrackerLayerTest, TestSetUpDD) {
-  typedef typename TypeParam::Dtype Dtype;
- 
-  this->setbottom(true, false);  
-  TrackerLayer<Dtype> layer(this->layer_param_);
- 
-    
-  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
-  EXPECT_EQ(this->blob_top_->shape(0), 2);
-  EXPECT_EQ(this->blob_top_->shape(1), 4);
-}
-
-TYPED_TEST(TrackerLayerTest, TestMultFTF) {
-  typedef typename TypeParam::Dtype Dtype;
-  this->setbottom(false, false, true);  
-  TrackerLayer<Dtype> layer(this->layer_param_);
-  
-  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
-  layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
-  
-  const Dtype* data = this->blob_top_->cpu_data();
-  const Dtype* in_data_a = this->blob_bottom_a_->cpu_data();
-  const Dtype* in_data_b = this->blob_bottom_b_->cpu_data();
-  
-  
-  std::stringstream buffer;
-  buffer << "FTF TEST" << endl << "A:" << endl;
-  for (int i = 0; i < this->blob_bottom_a_->count(); ++i) {
-  	if(i % 3 == 0)
-  		buffer << ';' << endl;
-	buffer << in_data_a[i] << ' ';    
-  }
-  
-  buffer << endl << "B:" << endl;
-  buffer.clear();
-  for (int i = 0; i < this->blob_bottom_b_->count(); ++i) {
-  	if(i % 2 == 0)
-  		buffer << ';' << endl;
-	buffer << in_data_b[i] << ' ';    
-  }
-  
-  buffer << endl << "OUT:" << endl;
-  buffer.clear();
-  for (int i = 0; i < this->blob_top_->count(); ++i) {
-	if(i % 2 == 0)
-  		buffer << ';' << endl;
-	buffer << data[i] << ' ';    
-  }
-  LOG(INFO) << buffer.str();
-}
-
-TYPED_TEST(TrackerLayerTest, TestMultFF) {
-  typedef typename TypeParam::Dtype Dtype;
-  this->setbottom(false, false);  
-  TrackerLayer<Dtype> layer(this->layer_param_);
-  
-  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
-  layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
-  
-  const Dtype* data = this->blob_top_->cpu_data();
-  const Dtype* in_data_a = this->blob_bottom_a_->cpu_data();
-  const Dtype* in_data_b = this->blob_bottom_b_->cpu_data();
-  
-  
-  std::stringstream buffer;
-  buffer << "FF TEST" << endl << "A:" << endl;
-  for (int i = 0; i < this->blob_bottom_a_->count(); ++i) {
-  	if(i % 4 == 0)
-  		buffer << ';' << endl;
-	buffer << in_data_a[i] << ' ';    
-  }
-  
-  buffer << endl << "B:" << endl;
-  buffer.clear();
-  for (int i = 0; i < this->blob_bottom_b_->count(); ++i) {
-  	if(i % 2 == 0)
-  		buffer << ';' << endl;
-	buffer << in_data_b[i] << ' ';    
-  }
-  
-  buffer << endl << "OUT:" << endl;
-  buffer.clear();
-  for (int i = 0; i < this->blob_top_->count(); ++i) {
-	if(i % 2 == 0)
-  		buffer << ';' << endl;
-	buffer << data[i] << ' ';    
-  }
-  LOG(INFO) << buffer.str();
-}
-
-TYPED_TEST(TrackerLayerTest, TestMultDF) {
-  typedef typename TypeParam::Dtype Dtype;
-  this->setbottom(true, false);  
-  TrackerLayer<Dtype> layer(this->layer_param_);
-  
-  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
-  layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
-  
-  const Dtype* data = this->blob_top_->cpu_data();
-  const Dtype* in_data_a = this->blob_bottom_a_->cpu_data();
-  const Dtype* in_data_b = this->blob_bottom_b_->cpu_data();
-  
-  
-  std::stringstream buffer;
-  buffer << "DF TEST" << endl << "A:" << endl;
-  for (int i = 0; i < this->blob_bottom_a_->count(); ++i) {
-  	if(i % 4 == 0)
-  		buffer << ';' << endl;
-	buffer << in_data_a[i] << ' ';    
-  }
-  
-  buffer << endl << "B:" << endl;
-  buffer.clear();
-  for (int i = 0; i < this->blob_bottom_b_->count(); ++i) {
-  	if(i % 2 == 0)
-  		buffer << ';' << endl;
-	buffer << in_data_b[i] << ' ';    
-  }
-  
-  buffer << endl << "OUT:" << endl;
-  buffer.clear();
-  for (int i = 0; i < this->blob_top_->count(); ++i) {
-	if(i % 2 == 0)
-  		buffer << ';' << endl;
-	buffer << data[i] << ' ';    
-  }
-  LOG(INFO) << buffer.str();
-}
-
-TYPED_TEST(TrackerLayerTest, TestMultDD) {
-  typedef typename TypeParam::Dtype Dtype;
-  this->setbottom(true, true);  
-  TrackerLayer<Dtype> layer(this->layer_param_);
-  
-  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
-  layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
-  
-  const Dtype* data = this->blob_top_->cpu_data();
-  const Dtype* in_data_a = this->blob_bottom_a_->cpu_data();
-  const Dtype* in_data_b = this->blob_bottom_b_->cpu_data();
-  
-  
-  std::stringstream buffer;
-  buffer << "DD TEST" << endl << "A:" << endl;
-  for (int i = 0; i < this->blob_bottom_a_->count(); ++i) {
-  	if(i % 4 == 0)
-  		buffer << ';' << endl;
-	buffer << in_data_a[i] << ' ';    
-  }
-  
-  buffer << endl << "B:" << endl;
-  buffer.clear();
-  for (int i = 0; i < this->blob_bottom_b_->count(); ++i) {
-  	if(i % 4 == 0)
-  		buffer << ';' << endl;
-	buffer << in_data_b[i] << ' ';    
-  }
-  
-  buffer << endl << "OUT:" << endl;
-  buffer.clear();
-  for (int i = 0; i < this->blob_top_->count(); ++i) {
-	if(i % 4 == 0)
-  		buffer << ';' << endl;
-	buffer << data[i] << ' ';    
-  }
-  LOG(INFO) << buffer.str();
-}
-
-//Gradient test
-TYPED_TEST(TrackerLayerTest, TestGradientFTF) {
-  typedef typename TypeParam::Dtype Dtype;
-  this->setbottom(false, false, true);  
-  TrackerLayer<Dtype> layer(this->layer_param_);
-  
- GradientChecker<Dtype> checker(1e-2, 1e-2);
-  checker.CheckGradient(&layer, this->blob_bottom_vec_,
-      this->blob_top_vec_);
-}
-
-
-TYPED_TEST(TrackerLayerTest, TestGradientFF) {
-  typedef typename TypeParam::Dtype Dtype;
-  this->setbottom(false, false);  
-  TrackerLayer<Dtype> layer(this->layer_param_);
-  
- GradientChecker<Dtype> checker(1e-2, 1e-2);
-  checker.CheckGradient(&layer, this->blob_bottom_vec_,
-      this->blob_top_vec_);
-}
-
-TYPED_TEST(TrackerLayerTest, TestGradientDF) {
-  typedef typename TypeParam::Dtype Dtype;
-  this->setbottom(true, false);  
-  TrackerLayer<Dtype> layer(this->layer_param_);
-  
- GradientChecker<Dtype> checker(1e-2, 1e-2);
-  checker.CheckGradient(&layer, this->blob_bottom_vec_,
-      this->blob_top_vec_);
-}
-
-TYPED_TEST(TrackerLayerTest, TestGradientDD) {
-  typedef typename TypeParam::Dtype Dtype;
-  this->setbottom(true, true);  
-  TrackerLayer<Dtype> layer(this->layer_param_);
-  
- GradientChecker<Dtype> checker(1e-2, 1e-2);
-  checker.CheckGradient(&layer, this->blob_bottom_vec_,
-      this->blob_top_vec_);
-}
 }  // namespace caffe

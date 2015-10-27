@@ -1016,7 +1016,7 @@ message TrackerParameter {
   
   
   // Lambda value in the inversion
-  optional float lambda = 1 [default = .5];
+  optional float lambda = 3 [default = .5];
 }
 
 

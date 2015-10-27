@@ -171,7 +171,7 @@ namespace caffe {
             {
                 LayerParameter* hm1_param = net_param->add_layer();
                 hm1_param->set_type("MatInv");
-                hm1_param->mutable_matinv_param()->set_lambda(this->layer_param_.lambda());
+                hm1_param->mutable_matinv_param()->set_lambda(this->layer_param_.tracker_param().lambda());
                 hm1_param->set_name("hm1_" + tm1s);
                 hm1_param->add_bottom("h1_" + tm1s);
                 hm1_param->add_top("hm1_" + tm1s);

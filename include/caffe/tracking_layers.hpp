@@ -137,8 +137,7 @@ template <typename Dtype>
     explicit TrackerLayer(const LayerParameter& param)
         : RecurrentLayer<Dtype>(param) {}
         
-    virtual inline const char* type() const { return "Tracker"; }
-        
+    virtual inline const char* type() const { return "Tracker"; }  
   protected:
     virtual void FillUnrolledNet(NetParameter* net_param) const;
     virtual void RecurrentInputBlobNames(vector<string>* names) const;

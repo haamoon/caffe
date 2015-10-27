@@ -86,5 +86,5 @@ STUB_GPU(SwitchLayer);
 #endif
 
 INSTANTIATE_CLASS(SwitchLayer);
-
+REGISTER_LAYER_CLASS(Switch);
 }  // namespace caffe
