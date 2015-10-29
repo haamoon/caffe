@@ -146,6 +146,38 @@ template <typename Dtype>
     virtual void OutputBlobNames(vector<string>* names) const;
 };
 
+/**
+ * @brief Pools the input image with respect to the segmentation mask by taking the average within segments.
+ *
+ */
+ 
+template <typename Dtype>
+class MaskedPoolingLayer : public Layer<Dtype> {
+ public:
+  explicit MaskedPoolingLayer(const LayerParameter& param)
+      : Layer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "MaskedPooling"; }
+  virtual inline int ExactNumBottomBlobs() const { return 1; }
+  virtual inline int ExactNumBlobs() const { return 1; }
+
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  private:
+  	int max_nseg_;
+};
+
 }  // namespace caffe
 
 #endif  // CAFFE_TRACKING_LAYERS_HPP_
