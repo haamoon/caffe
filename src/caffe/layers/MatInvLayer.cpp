@@ -66,7 +66,9 @@ void MatInvLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
 template <typename Dtype>
 void MatInvLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
-	
+	if (!propagate_down[0]) {
+    	return;
+  	}
 	Dtype* input_diff = bottom[0]->mutable_cpu_diff();
 	const Dtype* output_data = top[0]->cpu_data();
     const Dtype* output_diff = top[0]->cpu_diff();

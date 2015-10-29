@@ -59,6 +59,7 @@ template <typename Dtype>
 void SwitchLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
     const vector<bool>& propagate_down,
     const vector<Blob<Dtype>*>& bottom) {
+  CHECK(!propagate_down[1]) << "Can not propagate to switch gate!";
     
   const Dtype* switch_data = bottom[1]->cpu_data();
   const Dtype* top_diff = top[0]->cpu_diff();
