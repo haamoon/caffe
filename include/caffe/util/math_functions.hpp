@@ -152,6 +152,9 @@ void caffe_cpu_scale(const int n, const Dtype alpha, const Dtype *x, Dtype* y);
 
 #ifndef CPU_ONLY  // GPU
 
+template <typename Dtype>
+void caffe_gpu_inverse(int n, Dtype* X, Dtype* Y, int batchSize);
+
 // Decaf gpu gemm provides an interface that is almost the same as the cpu
 // gemm function - following the c convention and calling the fortran-order
 // gpu code under the hood.
