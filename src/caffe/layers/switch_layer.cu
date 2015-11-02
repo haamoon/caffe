@@ -10,7 +10,7 @@ namespace caffe {
 template <typename Dtype>
 __global__ void SwitchLayerForward(const int nthreads,
     const Dtype* const bottom_data, const Dtype* switch_data,
-    Dtype* const top_data, int input_offset) {
+    Dtype* const top_data, int input_offset, int lda) {
   CUDA_KERNEL_LOOP(index, nthreads) {
     int switch_index = index / input_offset;
     
@@ -18,7 +18,7 @@ __global__ void SwitchLayerForward(const int nthreads,
     	top_data[index] = bottom_data[index];
   	} else if(switch_data[swith_index] == 0) {
   		int mat_index = index % input_offset;
-  		if(mat_index % (D_2_ + 1) != 0) {
+  		if(mat_index % (lda + 1) != 0) {
   			top_data[index] = 0;
   		} else {
   			top_data[index] = 1;
@@ -49,7 +49,7 @@ void SwitchLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
   Dtype* top_data = top[0]->mutable_gpu_data();
   int count = top[0]->count();
   SwitchLayerForward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
-        count, input_data, switch_data, top_data, input_offset_);
+        count, input_data, switch_data, top_data, input_offset_, lda);
 }
 
 template <typename Dtype>
