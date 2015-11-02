@@ -24,6 +24,7 @@ __global__ void ScaleMatRow(const int nthreads,
   }
 }
 
+template <typename Dtype>
 __global__ void MatMatDot(const int nthreads,
     const Dtype* mat_a, const Dtype* mat_b, Dtype* output_data, 
     	int lda) {
