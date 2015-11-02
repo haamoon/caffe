@@ -293,28 +293,6 @@ __global__ void add_scalar_kernel(const int n, const Dtype alpha, Dtype* y) {
   }
 }
 
-template <typename Dtype>
-__global__ void caffe_strided_add_scalar_kernel(const int n, const Dtype alpha, int incx, Dtype* y) {
-  CUDA_KERNEL_LOOP(index, n/incx) {
-    y[index * incx] += alpha;
-  }
-}
-
-
-template <>
-void caffe_gpu_strided_add_scalar<float>(const int N, const float alpha, int incx, float *X) {
-  // NOLINT_NEXT_LINE(whitespace/operators)
-  caffe_strided_add_scalar_kernel<float><<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS>>>(
-      N, alpha, incx, X);
-}
-
-template <>
-void caffe_gpu_strided_add_scalar<double>(const int N, const double alpha, int incx, double *X) {
-  // NOLINT_NEXT_LINE(whitespace/operators)
-  caffe_strided_add_scalar_kernel<double><<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS>>>(
-      N, alpha, incx, X);
-}
-
 template <>
 void caffe_gpu_add_scalar(const int N, const float alpha, float* Y) {
   // NOLINT_NEXT_LINE(whitespace/operators)
