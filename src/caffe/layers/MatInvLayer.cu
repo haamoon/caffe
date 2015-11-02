@@ -30,7 +30,7 @@ __global__ void AddLambdaEye(const int nthreads,
 template <typename Dtype>
 void MatInvLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
 	const vector<Blob<Dtype>*>& top) {
-	Dtype* tmp_data = tmp_buffer_.gpu_data();
+	Dtype* tmp_data = tmp_buffer_.mutable_gpu_data();
 	const Dtype* input_data = bottom[0]->gpu_data();
 	int count = input_data->count();
 	
