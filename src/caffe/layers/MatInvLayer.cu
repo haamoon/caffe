@@ -56,4 +56,6 @@ void MatInvLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
 	}	
 }
 
+INSTANTIATE_LAYER_GPU_FUNCS(MatInvLayer);
+
 }  // namespace caffe

@@ -67,4 +67,5 @@ void SwitchLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
         count, top_diff, switch_data, bottom_diff, input_offset_);
 }
 
+INSTANTIATE_LAYER_GPU_FUNCS(SwitchLayer);
 }  // namespace caffe
