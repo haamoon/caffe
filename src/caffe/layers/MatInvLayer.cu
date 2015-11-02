@@ -35,7 +35,7 @@ void MatInvLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
 	int count = bottom[0]->count();
 	
 	AddLambdaEye<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
-				input_data, tmp_data, (Dtype) lambda_, offset_, dim_);
+				count, input_data, tmp_data, (Dtype) lambda_, offset_, dim_);
 	
 	caffe_gpu_inverse<Dtype>(dim_, tmp_data, top[0]->mutable_gpu_data(), N_);
 }
