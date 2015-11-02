@@ -17,7 +17,7 @@ namespace caffe {
 
 
 template <typename Dtype>
-void MatInvLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+void MatInvLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
 	const vector<Blob<Dtype>*>& top) {
 	
 	const Dtype* input_data = bottom[0]->gpu_data();
@@ -33,7 +33,7 @@ void MatInvLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
 
 
 template <typename Dtype>
-void MatInvLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
+void MatInvLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
 	if (!propagate_down[0]) {
     	return;

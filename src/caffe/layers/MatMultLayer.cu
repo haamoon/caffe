@@ -49,7 +49,7 @@ void MatMultLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
 
 
 template <typename Dtype>
-void MatMultLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
+void MatMultLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
 	
 	const Dtype* A_data = bottom[0]->gpu_data();
