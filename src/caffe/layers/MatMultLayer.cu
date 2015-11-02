@@ -37,7 +37,7 @@ void MatMultLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
 		caffe_copy(N_M_* C_offset_, B_data, C_data);
 		for (int n = 0; n < N_M_; ++n) {
 			for(int r = 0; r < D_2_; ++r) {	
-				caffe_gpu_scal(D_3_, A_data[A_offset_ * n + r], C_data + C_offset_ * n + D_3_ * r); 
+		//		caffe_gpu_scal(D_3_, A_data[A_offset_ * n + r], C_data + C_offset_ * n + D_3_ * r); 
 			}
 		}
 	} else if(!A_is_diag_ && B_is_diag_) {
