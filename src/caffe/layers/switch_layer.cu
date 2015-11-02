@@ -7,9 +7,8 @@
 
 namespace caffe {
 
-
 template <typename Dtype>
-__global__ void SwitchForward(const int nthreads,
+__global__ void SwitchLayerForward(const int nthreads,
     const Dtype* const bottom_data, const Dtype* switch_data,
     Dtype* const top_data) {
   CUDA_KERNEL_LOOP(index, nthreads) {
@@ -32,7 +31,7 @@ __global__ void SwitchForward(const int nthreads,
 }
 
 template <typename Dtype>
-__global__ void SwitchBackward(const int nthreads,
+__global__ void SwitchLayerBackward(const int nthreads,
     const Dtype* const top_diff, const Dtype* switch_data,
     Dtype* const bottom_diff) {
   CUDA_KERNEL_LOOP(index, nthreads) {
@@ -49,7 +48,7 @@ void SwitchLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
   const Dtype* switch_data = bottom[1]->gpu_data();
   Dtype* top_data = top[0]->mutable_gpu_data();
   int count = top[0]->count();
-  SwitchForward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
+  SwitchLayerForward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
         count, input_data, switch_data, top_data);
 }
 
@@ -64,7 +63,7 @@ void SwitchLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
 	Dtype* bottom_diff = bottom[0]->mutable_gpu_diff();
 	int count = top[0]->count();
 	
-	SwitchBackward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
+	SwitchLayerBackward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
         count, top_diff, switch_data, bottom_diff);
 }
 
