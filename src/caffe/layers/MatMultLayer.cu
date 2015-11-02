@@ -15,6 +15,26 @@
 namespace caffe {
 
 template <typename Dtype>
+__global__ void ScaleMatRow(const int nthreads,
+    const Dtype* input_mat, const Dtype* scales, Dtype* output_mat, 
+    	int lda) {
+  CUDA_KERNEL_LOOP(index, nthreads) {
+  	int row_index = index / lda;
+  	output_mat[index] = input_mat[index] * scales[row_index];
+  }
+}
+
+__global__ void MatMatDot(const int nthreads,
+    const Dtype* mat_a, const Dtype* mat_b, Dtype* output_data, 
+    	int lda) {
+  CUDA_KERNEL_LOOP(index, nthreads) {
+  	int row_index = index / lda;
+  	output_mat[index] = input_mat[index] * scales[row_index];
+  }
+}
+  
+
+template <typename Dtype>
 void MatMultLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
 	const vector<Blob<Dtype>*>& top) {
 	
@@ -34,12 +54,9 @@ void MatMultLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
 	//if A is diagonal we scale each row of B by 
 	//coressponding coefficient in diagonal of A
 	else if(A_is_diag_ && !B_is_diag_) {
-		caffe_copy(N_M_* C_offset_, B_data, C_data);
-		for (int n = 0; n < N_M_; ++n) {
-			for(int r = 0; r < D_2_; ++r) {	
-		//		caffe_gpu_scal(D_3_, A_data[A_offset_ * n + r], C_data + C_offset_ * n + D_3_ * r); 
-			}
-		}
+		int count = top[0]->count();
+		ScaleMatRow<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
+        count, B_data, A_data, C_data, D_3_);
 	} else if(!A_is_diag_ && B_is_diag_) {
 		LOG(FATAL) << "B can not be diagonal while A is not diagonal!";		
 	} else {
@@ -95,15 +112,16 @@ void MatMultLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
 		}		
 	}
 	else if(A_is_diag_ && !B_is_diag_) {
-		caffe_copy(N_M_* C_offset_, C_diff, B_diff);
+		if (propagate_down[1]) {
+			int count = top[0]->count();
+			ScaleMatRow<Dtype><<<CAFFE_GET_BLOCKS(count), 
+			CAFFE_CUDA_NUM_THREADS>>>(count, C_diff, A_data, B_diff, D_3_);  
+		}
 		for (int n = 0; n < N_M_; ++n) {
 			for( int r = 0; r < D_1_; ++r) {
 				if (propagate_down[0]) {
-					 //caffe_gpu_dot(D_3_, C_diff + C_offset_ * n + 
-					//		D_3_ * r, B_data + B_offset_ * n + D_3_ * r, A_diff + A_offset_ * n + r);
-				}
-				if (propagate_down[1]) {  
-					//caffe_gpu_scal(D_3_, A_data[A_offset_ * n + r], B_diff + B_offset_ * n + D_3_ * r);
+					 caffe_gpu_dot(D_3_, C_diff + C_offset_ * n + 
+							D_3_ * r, B_data + B_offset_ * n + D_3_ * r, A_diff + A_offset_ * n + r);
 				}
 			}			
 		}
