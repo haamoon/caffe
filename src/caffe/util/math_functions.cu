@@ -57,7 +57,7 @@ void caffe_gpu_inverse<float>(int n, float* X, float* Y, int batchSize)
     for (int i = 1; i < batchSize; i++)
       C[i] = C[i-1] + (n*n);
     CUDA_CHECK(cudaMemcpy(C_d,C,batchSize*sizeof(float *),cudaMemcpyHostToDevice));
-    CUDA_CHECK(cublasSgetriBatched(Caffe::cublas_handle(),n,(const float **)A_d,lda,P,C_d,lda,INFO,batchSize));
+    CUBLAS_CHECK(cublasSgetriBatched(Caffe::cublas_handle(),n,(const float **)A_d,lda,P,C_d,lda,INFO,batchSize));
 
     CUDA_CHECK(cudaMemcpy(INFOh,INFO,batchSize*sizeof(int),cudaMemcpyDeviceToHost));
 
