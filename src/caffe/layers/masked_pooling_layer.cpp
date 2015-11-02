@@ -112,9 +112,9 @@ void MaskedPoolingLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
 }
 
 
-#ifdef CPU_ONLY
-STUB_GPU(MaskedPoolingLayer);
-#endif
+//#ifdef CPU_ONLY
+//STUB_GPU(MaskedPoolingLayer);
+//#endif
 
 INSTANTIATE_CLASS(MaskedPoolingLayer);
 REGISTER_LAYER_CLASS(MaskedPooling);

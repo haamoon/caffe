@@ -79,9 +79,9 @@ TYPED_TEST(MatInvLayerTest, TestInverse) {
   const Dtype* in_data_a = this->blob_bottom_a_->cpu_data();
   
   for (int n = 0; n < 2; ++n) {
-    LOG(INFO) << "Matrix number " << n;
+    LOG(ERROR) << "Matrix number " << n;
     for (int i = 0; i < 3; ++i) { 
-    	LOG(INFO) << '[' << *(in_data_a + n * 9 + i * 3) << ' '
+    	LOG(ERROR) << '[' << *(in_data_a + n * 9 + i * 3) << ' '
     					 << *(in_data_a + n * 9 + i * 3 + 1)  << ' '
     					 << *(in_data_a + n * 9 + i * 3 + 2) << "] ["
     					 << *(data + n * 9 + i * 3) << ' '
