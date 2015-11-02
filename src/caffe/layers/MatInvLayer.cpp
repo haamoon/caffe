@@ -38,9 +38,15 @@ void MatInvLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
 	offset_ = dim_ * dim_;
 	
 	//Reshaping the temporary buffer
-	tmp_buffer_shape_.clear();
-	tmp_buffer_shape_.push_back(dim_);
-	tmp_buffer_shape_.push_back(dim_);
+	if(Caffe::mode() == Caffe::GPU) {
+		tmp_buffer_shape_ = input_shape_;
+	}
+	 else {
+		tmp_buffer_shape_.clear();
+		tmp_buffer_shape_.push_back(dim_);
+		tmp_buffer_shape_.push_back(dim_);
+  	}
+  	
   	tmp_buffer_.Reshape(tmp_buffer_shape_);
   	
   	//Reshaping top

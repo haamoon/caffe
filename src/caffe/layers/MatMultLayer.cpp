@@ -90,13 +90,6 @@ void MatMultLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
 		c_shape.push_back(D_3_);
 	}
 	top[0]->Reshape(c_shape); 
-	
-	
-  #ifndef CPU_ONLY  // GPU
-  	if (Caffe::mode() == Caffe::GPU) {
-  		tmp_blob_.Reshape(c_shape);
-  	}
-  #endif
 }
 
 template <typename Dtype>

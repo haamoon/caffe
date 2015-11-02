@@ -62,10 +62,6 @@ class MatMultLayer : public Layer<Dtype> {
   bool A_is_diag_;
   bool B_is_diag_;
   CBLAS_TRANSPOSE A_transpose_;
-  
-  #ifndef CPU_ONLY  // GPU
-  Blob tmp_blob_;
-  #endif
 };
 
 /**
