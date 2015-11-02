@@ -32,7 +32,7 @@ void MatInvLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
 	const vector<Blob<Dtype>*>& top) {
 	Dtype* tmp_data = tmp_buffer_.mutable_gpu_data();
 	const Dtype* input_data = bottom[0]->gpu_data();
-	int count = input_data->count();
+	int count = bottom[0]->count();
 	
 	AddLambdaEye<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
 				input_data, tmp_data, lambda_, offset_, dim_);
