@@ -25,10 +25,10 @@ void MatInvLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
 	
 	caffe_copy(N_* offset_, input_data, output_data);
 	
-	for (int n = 0; n < N_; ++n) {
-		caffe_gpu_strided_add_scalar<Dtype>(offset_, lambda_, dim_ + 1, output_data + offset_ * n);
+	//for (int n = 0; n < N_; ++n) {
+	//	//caffe_gpu_strided_add_scalar<Dtype>(offset_, lambda_, dim_ + 1, output_data + offset_ * n);
 		//caffe_cpu_inverse<Dtype>(dim_, output_data + offset_ * n);
-	}
+	//}//
 }
 
 
