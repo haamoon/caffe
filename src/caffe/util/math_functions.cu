@@ -50,7 +50,7 @@ void caffe_gpu_inverse<float>(int n, float* X, float* Y, int batchSize)
         LOG(FATAL) << "Matrix " << i << " inversion failed: " << INFOh[i];
       }
 
-	
+	float **C = (float **)malloc(batchSize*sizeof(float *));
     float **C_d;
     CUDA_CHECK(cudaMalloc(&C_d,batchSize*sizeof(float *)));
     C[0] = Y;
@@ -109,7 +109,7 @@ void caffe_gpu_inverse<double>(int n, double* X, double* Y, int batchSize)
         LOG(FATAL) << "Matrix " << i << " inversion failed: " << INFOh[i];
       }
 
-	
+	double **C = (double **)malloc(batchSize*sizeof(double *));
     double **C_d;
     CUDA_CHECK(cudaMalloc(&C_d,batchSize*sizeof(double *)));
     C[0] = Y;
