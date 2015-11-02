@@ -99,8 +99,8 @@ void MatMultLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
 		for (int n = 0; n < N_M_; ++n) {
 			for( int r = 0; r < D_1_; ++r) {
 				if (propagate_down[0]) {
-					 caffe_gpu_dot(D_3_, C_diff + C_offset_ * n + 
-							D_3_ * r, B_data + B_offset_ * n + D_3_ * r, A_diff + A_offset_ * n + r);
+					 //caffe_gpu_dot(D_3_, C_diff + C_offset_ * n + 
+					//		D_3_ * r, B_data + B_offset_ * n + D_3_ * r, A_diff + A_offset_ * n + r);
 				}
 				if (propagate_down[1]) {  
 					//caffe_gpu_scal(D_3_, A_data[A_offset_ * n + r], B_diff + B_offset_ * n + D_3_ * r);
