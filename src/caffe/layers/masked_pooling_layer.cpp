@@ -15,7 +15,9 @@ namespace caffe {
 template <typename Dtype>
 void MaskedPoolingLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
-  
+	
+  	MaskedPoolingParameter maskedpooling_param = this->layer_param_.masked_pooling_param();
+	max_nseg_ = maskedpooling_param.max_segments();
 }
 
 template <typename Dtype>
@@ -27,6 +29,13 @@ void MaskedPoolingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   channels_ = bottom[0]->channels();
   height_ = bottom[0]->height();
   width_ = bottom[0]->width();
+  
+  vector<int> top_shape;
+  top_shape.push_back(bottom[0]->num());
+  top_shape.push_back(channels_);
+  top_shape.push_back(max_nseg_);
+  
+  top[0]->Reshape(top_shape);
 }
 
 template <typename Dtype>
@@ -52,7 +61,7 @@ void MaskedPoolingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     		int start_ind = seg_inds[seg]; 
     		int end_ind = seg_inds[++seg];
     		for(int i = start_ind; i < end_ind; i++) {
-    			top_data[seg] += image_data[mask_data[i]]/(end_ind - start_ind);
+    			top_data[seg] += image_data[(int)mask_data[i]]/(end_ind - start_ind);
     		}
     	}
     	top_data += channels_;
@@ -75,8 +84,10 @@ void MaskedPoolingLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
     
 	const Dtype* top_diff = top[0]->cpu_diff();
 	Dtype* bottom_diff = bottom[0]->mutable_cpu_diff();
-  
-  
+    const Dtype* seg_nums = bottom[3]->cpu_data();
+  	const Dtype* seg_inds = bottom[2]->cpu_data();
+	const Dtype* mask_data = bottom[1]->cpu_data();
+	
 	for (int i = 0; i < bottom[0]->count(); ++i) {
 		bottom_diff[i] = 0;
 	}
@@ -89,11 +100,11 @@ void MaskedPoolingLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
 				int start_ind = seg_inds[seg]; 
 				int end_ind = seg_inds[++seg];
 				for(int i = start_ind; i < end_ind; i++) {
-					bottom_diff[mask_data[i]] += 
+					bottom_diff[(int)mask_data[i]] += 
 						top_diff[seg]/(end_ind - start_ind);
 				}
 			}
-			top_data += channels_;
+			top_diff += channels_;
 			bottom_diff += bottom[0]->offset(0,1);
 		}  	
 		seg_inds += max_nseg_;
@@ -106,6 +117,6 @@ STUB_GPU(MaskedPoolingLayer);
 #endif
 
 INSTANTIATE_CLASS(MaskedPoolingLayer);
-REGISTER_CLASS(MaskedPooling);
+REGISTER_LAYER_CLASS(MaskedPooling);
 
 }  // namespace caffe

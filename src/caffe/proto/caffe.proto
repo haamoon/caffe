@@ -306,7 +306,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 144 (last added: tracker_param)
+// LayerParameter next available layer-specific ID: 145 (last added: masked_pooling_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -373,6 +373,7 @@ message LayerParameter {
   optional InnerProductParameter inner_product_param = 117;
   optional LogParameter log_param = 134;
   optional LRNParameter lrn_param = 118;
+  optional MaskedPoolingParameter masked_pooling_param = 144;
   optional MatInvParameter matinv_param = 141;
   optional MatMultParameter matmult_param = 142;
   optional MemoryDataParameter memory_data_param = 119;
@@ -748,6 +749,11 @@ message LRNParameter {
 message MatMultParameter {
 	repeated bool diagonal_input = 1;
 	optional bool transpose_a = 2 [default = false];
+}
+
+
+message MaskedPoolingParameter {
+	required int32 max_segments = 1;
 }
 
 message MatInvParameter {

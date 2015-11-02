@@ -176,6 +176,10 @@ class MaskedPoolingLayer : public Layer<Dtype> {
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
   private:
   	int max_nseg_;
+  	int channels_;
+  	int width_;
+  	int height_;
+  	
 };
 
 }  // namespace caffe
