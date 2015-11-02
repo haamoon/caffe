@@ -16,16 +16,13 @@ __global__ void SwitchLayerForward(const int nthreads,
     
     if(switch_data[switch_index] == 1) {
     	top_data[index] = bottom_data[index];
-  	} else if(switch_data[switch_index] == 0) {
+  	} else {
   		int mat_index = index % input_offset;
   		if(mat_index % (lda + 1) != 0) {
   			top_data[index] = 0;
   		} else {
   			top_data[index] = 1;
   		}
-  	}
-  	else {
-  		LOG(FATAL) << "switch_data can be whether 0 or 1";
   	}
   }
 }
