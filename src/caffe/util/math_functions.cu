@@ -57,7 +57,7 @@ void caffe_gpu_inverse<float>(int n, float* X, float* Y, int batchSize)
     for (int i = 1; i < batchSize; i++)
       C[i] = C[i-1] + (n*n);
     CUDA_CHECK(cudaMemcpy(C_d,C,batchSize*sizeof(float *),cudaMemcpyHostToDevice));
-    CUDA_CHECK(cublasSgetriBatched(handle,n,(const float **)A_d,lda,P,C_d,lda,INFO,batchSize));
+    CUDA_CHECK(cublasSgetriBatched(Caffe::cublas_handle(),n,(const float **)A_d,lda,P,C_d,lda,INFO,batchSize));
 
     CUDA_CHECK(cudaMemcpy(INFOh,INFO,batchSize*sizeof(int),cudaMemcpyDeviceToHost));
 
@@ -96,7 +96,8 @@ void caffe_gpu_inverse<double>(int n, double* X, double* Y, int batchSize)
     CUDA_CHECK(cudaMemcpy(A_d,A,batchSize*sizeof(double *),cudaMemcpyHostToDevice));
 
 	/*  Turn X into its LU form, store pivot matrix  */ 
-    CUBLAS_CHECK(cublasDgetrfBatched(Caffe::cublas_handle(),n,A_d,lda,P,INFO,batchSize));
+    CUBLAS_CHECK(cublasDgetrfBatched(Caffe::cublas_handle(),n,
+    									A_d,lda,P,INFO,batchSize));
 
 	/*  Don't bother continuing when illegal argument (info<0) or singularity (info>0) occurs  */
     int INFOh[batchSize];
@@ -116,7 +117,8 @@ void caffe_gpu_inverse<double>(int n, double* X, double* Y, int batchSize)
     for (int i = 1; i < batchSize; i++)
       C[i] = C[i-1] + (n*n);
     CUDA_CHECK(cudaMemcpy(C_d,C,batchSize*sizeof(double *),cudaMemcpyHostToDevice));
-    CUBLAS_CHECK(cublasDgetriBatched(handle,n,(const double **)A_d,lda,P,C_d,lda,INFO,batchSize));
+    CUBLAS_CHECK(cublasDgetriBatched(Caffe::cublas_handle(), n, 
+    					(const double **)A_d, lda,P, C_d, lda, INFO, batchSize));
 
     CUDA_CHECK(cudaMemcpy(INFOh,INFO,batchSize*sizeof(int),cudaMemcpyDeviceToHost));
 
