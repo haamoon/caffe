@@ -18,7 +18,7 @@ namespace caffe {
 
 template <typename Dtype>
 __global__ void AddLambdaEye(const int nthreads,
-    const Dtype* const bottom_data, Dtype* top_data, float lambda, int input_offset, int lda) {
+    const Dtype* const bottom_data, Dtype* top_data, Dtype lambda, int input_offset, int lda) {
   CUDA_KERNEL_LOOP(index, nthreads) {
   	int mat_index = index % input_offset;
   	top_data[index] = (mat_index % (lda + 1) == 0) ? 
@@ -35,7 +35,7 @@ void MatInvLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
 	int count = bottom[0]->count();
 	
 	AddLambdaEye<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
-				input_data, tmp_data, lambda_, offset_, dim_);
+				input_data, tmp_data, (Dtype) lambda_, offset_, dim_);
 	
 	caffe_gpu_inverse<Dtype>(dim_, tmp_data, top[0]->mutable_gpu_data(), N_);
 }
