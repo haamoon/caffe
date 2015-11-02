@@ -12,6 +12,126 @@
 
 namespace caffe {
 
+
+
+template <>
+void caffe_gpu_inverse<float>(int n, float* X, float* Y, int batchSize)
+{
+    int *P, *INFO;
+
+    CUDA_CHECK(cudaMalloc(&P, n * batchSize * sizeof(int)));
+    CUDA_CHECK(cudaMalloc(&INFO,  batchSize * sizeof(int)));
+
+    int lda = n;
+
+	//create pointer to matrices
+    float **A = (float **)malloc(batchSize*sizeof(float *));
+    float **A_d;
+    
+    CUDA_CHECK(cudaMalloc(&A_d,batchSize*sizeof(float *)));
+    
+    
+    A[0] = X;
+    for (int i = 1; i < batchSize; i++)
+      A[i] = A[i-1]+(n*n);
+    CUDA_CHECK(cudaMemcpy(A_d,A,batchSize*sizeof(float *),cudaMemcpyHostToDevice));
+
+	/*  Turn X into its LU form, store pivot matrix  */ 
+    CUBLAS_CHECK(cublasSgetrfBatched(Caffe::cublas_handle(),n,A_d,lda,P,INFO,batchSize));
+
+	/*  Don't bother continuing when illegal argument (info<0) or singularity (info>0) occurs  */
+    int INFOh[batchSize];
+    CUDA_CHECK(cudaMemcpy(INFOh,INFO,batchSize*sizeof(int),cudaMemcpyDeviceToHost));
+
+    for (int i = 0; i < batchSize; i++)
+      if(INFOh[i]  != 0)
+      {
+        cudaDeviceReset();
+        LOG(FATAL) << "Matrix " << i << " inversion failed: " << INFOh[i];
+      }
+
+	
+    float **C_d;
+    CUDA_CHECK(cudaMalloc(&C_d,batchSize*sizeof(float *)));
+    C[0] = Y;
+    for (int i = 1; i < batchSize; i++)
+      C[i] = C[i-1] + (n*n);
+    CUDA_CHECK(cudaMemcpy(C_d,C,batchSize*sizeof(float *),cudaMemcpyHostToDevice));
+    CUDA_CHECK(cublasSgetriBatched(handle,n,(const float **)A_d,lda,P,C_d,lda,INFO,batchSize));
+
+    CUDA_CHECK(cudaMemcpy(INFOh,INFO,batchSize*sizeof(int),cudaMemcpyDeviceToHost));
+
+    for (int i = 0; i < batchSize; i++)
+      if(INFOh[i] != 0)
+      {
+        cudaDeviceReset();
+        LOG(FATAL) << "Matrix " << i << " inversion failed: " << INFOh[i];
+      }
+    
+    cudaFree(A_d); free(A);
+    cudaFree(C_d); free(C);
+    cudaFree(P); cudaFree(INFO);
+}
+
+template <>
+void caffe_gpu_inverse<double>(int n, double* X, double* Y, int batchSize)
+{
+    int *P, *INFO;
+
+    CUDA_CHECK(cudaMalloc(&P, n * batchSize * sizeof(int)));
+    CUDA_CHECK(cudaMalloc(&INFO,  batchSize * sizeof(int)));
+
+    int lda = n;
+
+	//create pointer to matrices
+    double **A = (double **)malloc(batchSize*sizeof(double *));
+    double **A_d;
+    
+    CUDA_CHECK(cudaMalloc(&A_d,batchSize*sizeof(double *)));
+    
+    
+    A[0] = X;
+    for (int i = 1; i < batchSize; i++)
+      A[i] = A[i-1]+(n*n);
+    CUDA_CHECK(cudaMemcpy(A_d,A,batchSize*sizeof(double *),cudaMemcpyHostToDevice));
+
+	/*  Turn X into its LU form, store pivot matrix  */ 
+    CUBLAS_CHECK(cublasDgetrfBatched(Caffe::cublas_handle(),n,A_d,lda,P,INFO,batchSize));
+
+	/*  Don't bother continuing when illegal argument (info<0) or singularity (info>0) occurs  */
+    int INFOh[batchSize];
+    CUDA_CHECK(cudaMemcpy(INFOh,INFO,batchSize*sizeof(int),cudaMemcpyDeviceToHost));
+
+    for (int i = 0; i < batchSize; i++)
+      if(INFOh[i]  != 0)
+      {
+        cudaDeviceReset();
+        LOG(FATAL) << "Matrix " << i << " inversion failed: " << INFOh[i];
+      }
+
+	
+    double **C_d;
+    CUDA_CHECK(cudaMalloc(&C_d,batchSize*sizeof(double *)));
+    C[0] = Y;
+    for (int i = 1; i < batchSize; i++)
+      C[i] = C[i-1] + (n*n);
+    CUDA_CHECK(cudaMemcpy(C_d,C,batchSize*sizeof(double *),cudaMemcpyHostToDevice));
+    CUBLAS_CHECK(cublasDgetriBatched(handle,n,(const double **)A_d,lda,P,C_d,lda,INFO,batchSize));
+
+    CUDA_CHECK(cudaMemcpy(INFOh,INFO,batchSize*sizeof(int),cudaMemcpyDeviceToHost));
+
+    for (int i = 0; i < batchSize; i++)
+      if(INFOh[i] != 0)
+      {
+        cudaDeviceReset();
+        LOG(FATAL) << "Matrix " << i << " inversion failed: " << INFOh[i];
+      }
+    
+    cudaFree(A_d); free(A);
+    cudaFree(C_d); free(C);
+    cudaFree(P); cudaFree(INFO);
+}
+
 template <>
 void caffe_gpu_gemm<float>(const CBLAS_TRANSPOSE TransA,
     const CBLAS_TRANSPOSE TransB, const int M, const int N, const int K,
@@ -169,6 +289,28 @@ __global__ void add_scalar_kernel(const int n, const Dtype alpha, Dtype* y) {
   CUDA_KERNEL_LOOP(index, n) {
     y[index] += alpha;
   }
+}
+
+template <typename Dtype>
+__global__ void caffe_strided_add_scalar(const int n, const Dtype alpha, int incx, Dtype* y) {
+  CUDA_KERNEL_LOOP(index, n/incx) {
+    y[index * incx] += alpha;
+  }
+}
+
+
+template <>
+void caffe_gpu_strided_add_scalar(const int N, const float alpha, int incx, float *X) {
+  // NOLINT_NEXT_LINE(whitespace/operators)
+  caffe_strided_add_scalar<float><<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS>>>(
+      N, alpha, incx, X);
+}
+
+template <>
+void caffe_gpu_strided_add_scalar(const int N, const double alpha, int incx, double *X) {
+  // NOLINT_NEXT_LINE(whitespace/operators)
+  caffe_strided_add_scalar<double><<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS>>>(
+      N, alpha, incx, X);
 }
 
 template <>
