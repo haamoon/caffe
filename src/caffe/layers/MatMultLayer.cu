@@ -126,17 +126,6 @@ void MatMultLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
 			MatMatDot<Dtype><<<CAFFE_GET_BLOCKS(row_count), 
 				CAFFE_CUDA_NUM_THREADS>>>(row_count, C_diff, B_data, A_diff, D_3_);
 		}
-		(const int nthreads,
-    const Dtype* mat_a, const Dtype* mat_b, Dtype* output_data, 
-    	int lda)
-		for (int n = 0; n < N_M_; ++n) {
-			for( int r = 0; r < D_1_; ++r) {
-				if (propagate_down[0]) {
-					 caffe_gpu_dot(D_3_, C_diff + C_offset_ * n + 
-							D_3_ * r, B_data + B_offset_ * n + D_3_ * r, A_diff + A_offset_ * n + r);
-				}
-			}			
-		}
 	} else if(!A_is_diag_ && B_is_diag_) {
 		LOG(FATAL) << "B can not be diagonal while A is not diagonal!";	
 	} else {
