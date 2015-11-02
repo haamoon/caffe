@@ -28,8 +28,11 @@ __global__ void MatMatDot(const int nthreads,
     const Dtype* mat_a, const Dtype* mat_b, Dtype* output_data, 
     	int lda) {
   CUDA_KERNEL_LOOP(index, nthreads) {
-  	int row_index = index / lda;
-  	output_mat[index] = input_mat[index] * scales[row_index];
+  	output_data[index] = 0;
+  	int offset = index * lda;
+  	for(int i = offset; i < (offset + lda); ++i) {
+  	  	output_data[index] += mat_a[i] * mat_b[i];
+  	}
   }
 }
   
@@ -117,6 +120,14 @@ void MatMultLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
 			ScaleMatRow<Dtype><<<CAFFE_GET_BLOCKS(count), 
 			CAFFE_CUDA_NUM_THREADS>>>(count, C_diff, A_data, B_diff, D_3_);  
 		}
+		if (propagate_down[0]) {
+			int row_count = bottom[0]->count();
+			MatMatDot<Dtype><<<CAFFE_GET_BLOCKS(row_count), 
+				CAFFE_CUDA_NUM_THREADS>>>(row_count, C_diff, B_data, A_diff, D_3_);
+		}
+		(const int nthreads,
+    const Dtype* mat_a, const Dtype* mat_b, Dtype* output_data, 
+    	int lda)
 		for (int n = 0; n < N_M_; ++n) {
 			for( int r = 0; r < D_1_; ++r) {
 				if (propagate_down[0]) {
