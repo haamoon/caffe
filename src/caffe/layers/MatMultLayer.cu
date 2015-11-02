@@ -103,7 +103,7 @@ void MatMultLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
 							D_3_ * r, B_data + B_offset_ * n + D_3_ * r, A_diff + A_offset_ * n + r);
 				}
 				if (propagate_down[1]) {  
-					caffe_gpu_scal(D_3_, A_data[A_offset_ * n + r], B_diff + B_offset_ * n + D_3_ * r);
+					//caffe_gpu_scal(D_3_, A_data[A_offset_ * n + r], B_diff + B_offset_ * n + D_3_ * r);
 				}
 			}			
 		}
