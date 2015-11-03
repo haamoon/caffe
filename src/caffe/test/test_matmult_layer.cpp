@@ -115,132 +115,6 @@ class MatMultLayerTest : public MultiDeviceTest<TypeParam> {
 TYPED_TEST_CASE(MatMultLayerTest, TestDtypesAndDevices);
 
 
-TYPED_TEST(MatMultLayerTest, TestSetUpFTF) {
-  typedef typename TypeParam::Dtype Dtype;
-  
-  this->setbottom(false, false, true);    
-  MatMultLayer<Dtype> layer(this->layer_param_);
-
-  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
-  EXPECT_EQ(this->blob_top_->shape(0), 2);
-  EXPECT_EQ(this->blob_top_->shape(1), 3);
-  EXPECT_EQ(this->blob_top_->shape(2), 2);
-}
-
-TYPED_TEST(MatMultLayerTest, TestSetUpFF) {
-  typedef typename TypeParam::Dtype Dtype;
-  
-  this->setbottom(false, false);    
-  MatMultLayer<Dtype> layer(this->layer_param_);
-
-  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
-  EXPECT_EQ(this->blob_top_->shape(0), 2);
-  EXPECT_EQ(this->blob_top_->shape(1), 3);
-  EXPECT_EQ(this->blob_top_->shape(2), 2);
-}
-
-TYPED_TEST(MatMultLayerTest, TestSetUpDF) {
-  typedef typename TypeParam::Dtype Dtype;
-  
-  this->setbottom(true, false);    
-  MatMultLayer<Dtype> layer(this->layer_param_);
-
-  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
-  EXPECT_EQ(this->blob_top_->shape(0), 2);
-  EXPECT_EQ(this->blob_top_->shape(1), 4);
-  EXPECT_EQ(this->blob_top_->shape(2), 2);
-}
-
-
-TYPED_TEST(MatMultLayerTest, TestSetUpDD) {
-  typedef typename TypeParam::Dtype Dtype;
- 
-  this->setbottom(true, false);  
-  MatMultLayer<Dtype> layer(this->layer_param_);
- 
-    
-  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
-  EXPECT_EQ(this->blob_top_->shape(0), 2);
-  EXPECT_EQ(this->blob_top_->shape(1), 4);
-}
-
-TYPED_TEST(MatMultLayerTest, TestMultFTF) {
-  typedef typename TypeParam::Dtype Dtype;
-  this->setbottom(false, false, true);  
-  MatMultLayer<Dtype> layer(this->layer_param_);
-  
-  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
-  layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
-  
-  const Dtype* data = this->blob_top_->cpu_data();
-  const Dtype* in_data_a = this->blob_bottom_a_->cpu_data();
-  const Dtype* in_data_b = this->blob_bottom_b_->cpu_data();
-  
-  
-  std::stringstream buffer;
-  buffer << "FTF TEST" << endl << "A:" << endl;
-  for (int i = 0; i < this->blob_bottom_a_->count(); ++i) {
-  	if(i % 3 == 0)
-  		buffer << ';' << endl;
-	buffer << in_data_a[i] << ' ';    
-  }
-  
-  buffer << endl << "B:" << endl;
-  buffer.clear();
-  for (int i = 0; i < this->blob_bottom_b_->count(); ++i) {
-  	if(i % 2 == 0)
-  		buffer << ';' << endl;
-	buffer << in_data_b[i] << ' ';    
-  }
-  
-  buffer << endl << "OUT:" << endl;
-  buffer.clear();
-  for (int i = 0; i < this->blob_top_->count(); ++i) {
-	if(i % 2 == 0)
-  		buffer << ';' << endl;
-	buffer << data[i] << ' ';    
-  }
-  LOG(INFO) << buffer.str();
-}
-
-TYPED_TEST(MatMultLayerTest, TestMultFF) {
-  typedef typename TypeParam::Dtype Dtype;
-  this->setbottom(false, false);  
-  MatMultLayer<Dtype> layer(this->layer_param_);
-  
-  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
-  layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
-  
-  const Dtype* data = this->blob_top_->cpu_data();
-  const Dtype* in_data_a = this->blob_bottom_a_->cpu_data();
-  const Dtype* in_data_b = this->blob_bottom_b_->cpu_data();
-  
-  
-  std::stringstream buffer;
-  buffer << "FF TEST" << endl << "A:" << endl;
-  for (int i = 0; i < this->blob_bottom_a_->count(); ++i) {
-  	if(i % 4 == 0)
-  		buffer << ';' << endl;
-	buffer << in_data_a[i] << ' ';    
-  }
-  
-  buffer << endl << "B:" << endl;
-  buffer.clear();
-  for (int i = 0; i < this->blob_bottom_b_->count(); ++i) {
-  	if(i % 2 == 0)
-  		buffer << ';' << endl;
-	buffer << in_data_b[i] << ' ';    
-  }
-  
-  buffer << endl << "OUT:" << endl;
-  buffer.clear();
-  for (int i = 0; i < this->blob_top_->count(); ++i) {
-	if(i % 2 == 0)
-  		buffer << ';' << endl;
-	buffer << data[i] << ' ';    
-  }
-  LOG(INFO) << buffer.str();
-}
 
 TYPED_TEST(MatMultLayerTest, TestMultDF) {
   typedef typename TypeParam::Dtype Dtype;
@@ -278,69 +152,9 @@ TYPED_TEST(MatMultLayerTest, TestMultDF) {
   		buffer << ';' << endl;
 	buffer << data[i] << ' ';    
   }
-  LOG(INFO) << buffer.str();
+  LOG(ERROR) << buffer.str();
 }
 
-TYPED_TEST(MatMultLayerTest, TestMultDD) {
-  typedef typename TypeParam::Dtype Dtype;
-  this->setbottom(true, true);  
-  MatMultLayer<Dtype> layer(this->layer_param_);
-  
-  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
-  layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
-  
-  const Dtype* data = this->blob_top_->cpu_data();
-  const Dtype* in_data_a = this->blob_bottom_a_->cpu_data();
-  const Dtype* in_data_b = this->blob_bottom_b_->cpu_data();
-  
-  
-  std::stringstream buffer;
-  buffer << "DD TEST" << endl << "A:" << endl;
-  for (int i = 0; i < this->blob_bottom_a_->count(); ++i) {
-  	if(i % 4 == 0)
-  		buffer << ';' << endl;
-	buffer << in_data_a[i] << ' ';    
-  }
-  
-  buffer << endl << "B:" << endl;
-  buffer.clear();
-  for (int i = 0; i < this->blob_bottom_b_->count(); ++i) {
-  	if(i % 4 == 0)
-  		buffer << ';' << endl;
-	buffer << in_data_b[i] << ' ';    
-  }
-  
-  buffer << endl << "OUT:" << endl;
-  buffer.clear();
-  for (int i = 0; i < this->blob_top_->count(); ++i) {
-	if(i % 4 == 0)
-  		buffer << ';' << endl;
-	buffer << data[i] << ' ';    
-  }
-  LOG(INFO) << buffer.str();
-}
-
-//Gradient test
-TYPED_TEST(MatMultLayerTest, TestGradientFTF) {
-  typedef typename TypeParam::Dtype Dtype;
-  this->setbottom(false, false, true);  
-  MatMultLayer<Dtype> layer(this->layer_param_);
-  
- GradientChecker<Dtype> checker(1e-2, 1e-2);
-  checker.CheckGradient(&layer, this->blob_bottom_vec_,
-      this->blob_top_vec_);
-}
-
-
-TYPED_TEST(MatMultLayerTest, TestGradientFF) {
-  typedef typename TypeParam::Dtype Dtype;
-  this->setbottom(false, false);  
-  MatMultLayer<Dtype> layer(this->layer_param_);
-  
- GradientChecker<Dtype> checker(1e-2, 1e-2);
-  checker.CheckGradient(&layer, this->blob_bottom_vec_,
-      this->blob_top_vec_);
-}
 
 TYPED_TEST(MatMultLayerTest, TestGradientDF) {
   typedef typename TypeParam::Dtype Dtype;
@@ -352,13 +166,4 @@ TYPED_TEST(MatMultLayerTest, TestGradientDF) {
       this->blob_top_vec_);
 }
 
-TYPED_TEST(MatMultLayerTest, TestGradientDD) {
-  typedef typename TypeParam::Dtype Dtype;
-  this->setbottom(true, true);  
-  MatMultLayer<Dtype> layer(this->layer_param_);
-  
- GradientChecker<Dtype> checker(1e-2, 1e-2);
-  checker.CheckGradient(&layer, this->blob_bottom_vec_,
-      this->blob_top_vec_);
-}
 }  // namespace caffe
