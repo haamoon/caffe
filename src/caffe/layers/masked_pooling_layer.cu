@@ -28,8 +28,8 @@ __global__ void MaskedPoolingForward(const int nthreads,
  		int start_ind = seg_inds[n * max_nseg + seg]; 
     	int end_ind = seg_inds[n * max_nseg + seg + 1];
     	for(int i = start_ind; i < end_ind; i++) {
-    		top_data[seg * channels + c] += image_data[n * n_pixcel * channels
-    		 + c * n_pixcel + (int)mask_data[n * mask_lenght + i]]
+    		top_data[(n * max_nseg + seg) * channels + c] += image_data[ (n * channels
+    		 + c) * n_pixcel + (int)mask_data[n * mask_lenght + i]]
     		 /(end_ind - start_ind);
     	}
     }
@@ -53,9 +53,9 @@ __global__ void MaskedPoolingBackward(const int nthreads,
 		int start_ind = seg_inds[n * max_nseg + seg]; 
 		int end_ind = seg_inds[n * max_nseg + seg + 1];
 		for(int i = start_ind; i < end_ind; i++) {
-			bottom_diff[n * n_pixcel * channels + c * n_pixcel + 
+			bottom_diff[(n * channels + c) * n_pixcel + 
 				(int)mask_data[n * mask_lenght + i]] += 
-			top_diff[seg * channels + c]/(end_ind - start_ind);
+			top_diff[(n * max_nseg + seg) * channels + c]/(end_ind - start_ind);
 		}
 	}		
   }

@@ -19,13 +19,26 @@ void MaskedPoolingLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
 template <typename Dtype>
 void MaskedPoolingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
-  CHECK_EQ(4, bottom[0]->num_axes()) << "Input must have 4 axes, "
+  CHECK_EQ(4, bottom[0]->num_axes()) << "Input image must have 4 axes, "
       << "corresponding to (num, channels, height, width)";
+  CHECK_EQ(2, bottom[1]->num_axes()) << "Input mask must have 2 axes, "
+      << "corresponding to (num, segment_inds)";
+  CHECK_EQ(2, bottom[2]->num_axes()) << "Input inds must have 2 axes, "
+      << "corresponding to (num, segment_start_inds)";
+  CHECK_EQ(1, bottom[3]->num_axes()) << "Input nseg must have 1 axes, "
+      << "corresponding to (num)";
+  
+  int N = bottom[0]->shape(0);
+  CHECK_EQ(N, bottom[1]->shape(0));
+  CHECK_EQ(N, bottom[2]->shape(0));
+  CHECK_EQ(N, bottom[3]->shape(0));
   
   channels_ = bottom[0]->channels();
   
   //bottom[1] is mask with size N_ x mask_lenght
   mask_lenght_ = bottom[1]->shape(1);
+  
+  
   //bottom[2] has segmens starting indeces with size N_ x max_nseg_
   max_nseg_ = bottom[2]->shape(1);
   
@@ -57,15 +70,16 @@ void MaskedPoolingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   for (int n = 0; n < bottom[0]->num(); ++n) {
   	for (int c = 0; c < channels_; ++c) {
     	//iterate over segments
-    	for(int seg = 0; seg < seg_nums[n];) {
+    	for(int seg = 0; seg < seg_nums[n]; ++seg) {
     		int start_ind = seg_inds[seg]; 
-    		int end_ind = seg_inds[++seg];
+    		int end_ind = seg_inds[seg + 1];
     		for(int i = start_ind; i < end_ind; i++) {
     			top_data[seg * channels_ + c] += image_data[(int)mask_data[i]]/(end_ind - start_ind);
     		}
     	}
     	image_data += bottom[0]->offset(0,1);
-    }  	
+    }
+    top_data += channels_ * max_nseg_;   	
     seg_inds += max_nseg_;
     mask_data += mask_lenght_;
   }
@@ -96,16 +110,17 @@ void MaskedPoolingLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
 	for (int n = 0; n < bottom[0]->num(); ++n) {
 		for (int c = 0; c < channels_; ++c) {
 			//iterate over segments
-			for(int seg = 0; seg < seg_nums[n];) {
+			for(int seg = 0; seg < seg_nums[n]; ++seg) {
 				int start_ind = seg_inds[seg]; 
-				int end_ind = seg_inds[++seg];
+				int end_ind = seg_inds[seg + 1];
 				for(int i = start_ind; i < end_ind; i++) {
 					bottom_diff[(int)mask_data[i]] += 
 						top_diff[seg * channels_ + c]/(end_ind - start_ind);
 				}
 			}
 			bottom_diff += bottom[0]->offset(0,1);
-		}  	
+		}
+		top_diff += channels_ * max_nseg_;  	
 		seg_inds += max_nseg_;
 		mask_data += mask_lenght_;
 	}
