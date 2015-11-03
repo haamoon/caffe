@@ -200,7 +200,7 @@ TYPED_TEST(MatMultLayerTest, TestMultFTF) {
   		buffer << ';' << endl;
 	buffer << data[i] << ' ';    
   }
-  LOG(INFO) << buffer.str();
+  LOG(ERROR) << buffer.str();
 }
 
 TYPED_TEST(MatMultLayerTest, TestMultFF) {
@@ -239,7 +239,7 @@ TYPED_TEST(MatMultLayerTest, TestMultFF) {
   		buffer << ';' << endl;
 	buffer << data[i] << ' ';    
   }
-  LOG(INFO) << buffer.str();
+  LOG(ERROR) << buffer.str();
 }
 
 TYPED_TEST(MatMultLayerTest, TestMultDF) {
@@ -278,7 +278,7 @@ TYPED_TEST(MatMultLayerTest, TestMultDF) {
   		buffer << ';' << endl;
 	buffer << data[i] << ' ';    
   }
-  LOG(INFO) << buffer.str();
+  LOG(ERROR) << buffer.str();
 }
 
 TYPED_TEST(MatMultLayerTest, TestMultDD) {
@@ -317,7 +317,7 @@ TYPED_TEST(MatMultLayerTest, TestMultDD) {
   		buffer << ';' << endl;
 	buffer << data[i] << ' ';    
   }
-  LOG(INFO) << buffer.str();
+  LOG(ERROR) << buffer.str();
 }
 
 //Gradient test
