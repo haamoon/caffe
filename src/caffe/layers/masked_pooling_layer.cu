@@ -28,7 +28,7 @@ __global__ void MaskedPoolingForward(const int nthreads,
  		int start_ind = seg_inds[n * max_nseg + seg]; 
     	int end_ind = seg_inds[n * max_nseg + seg + 1];
     	for(int i = start_ind; i < end_ind; i++) {
-    		top_data[seg * channels_ + c] += image_data[n * n_pixcel * channels
+    		top_data[seg * channels + c] += image_data[n * n_pixcel * channels
     		 + c * n_pixcel + (int)mask_data[n * mask_lenght + i]]
     		 /(end_ind - start_ind);
     	}
@@ -55,7 +55,7 @@ __global__ void MaskedPoolingBackward(const int nthreads,
 		for(int i = start_ind; i < end_ind; i++) {
 			bottom_diff[n * n_pixcel * channels + c * n_pixcel + 
 				(int)mask_data[n * mask_lenght + i]] += 
-			top_diff[seg * channels_ + c]/(end_ind - start_ind);
+			top_diff[seg * channels + c]/(end_ind - start_ind);
 		}
 	}		
   }
@@ -97,7 +97,7 @@ void MaskedPoolingLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   	const Dtype* seg_inds = bottom[2]->gpu_data();
 	const Dtype* mask_data = bottom[1]->gpu_data();
 	
-	caffe_gpu_set(bottom[0]->count(), (Dtype)0.0, bottom_diff[i]);
+	caffe_gpu_set(bottom[0]->count(), (Dtype)0.0, bottom_diff);
   
   	int count = bottom[0]->count(0,2);
     MaskedPoolingBackward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
