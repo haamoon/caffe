@@ -157,7 +157,7 @@ TYPED_TEST(MaskedPoolingLayerTest, TestSetUp) {
   EXPECT_EQ(this->blob_X_->shape(2), 3);
 }
 
-/*TYPED_TEST(MaskedPoolingLayerTest, TestMaskedPooling) {
+TYPED_TEST(MaskedPoolingLayerTest, TestMaskedPooling) {
   typedef typename TypeParam::Dtype Dtype;
   LayerParameter layer_param;
 
@@ -183,7 +183,7 @@ TYPED_TEST(MaskedPoolingLayerTest, TestSetUp) {
   this->printMat(buffer, X_data, 3, this->blob_X_->count());
   
   LOG(ERROR) << buffer.str();
-}*/
+}
 
 
 TYPED_TEST(MaskedPoolingLayerTest, TestMaskedPoolingGradient) {
