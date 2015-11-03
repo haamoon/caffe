@@ -49,7 +49,7 @@ __global__ void MaskedPoolingBackward(const int nthreads,
   	int n = index / channels;
   	
  	//iterate over segments
-	for(int seg = 0; seg < seg_nums[n];) {
+	for(int seg = 0; seg < seg_nums[n]; ++seg) {
 		int start_ind = seg_inds[n * max_nseg + seg]; 
 		int end_ind = seg_inds[n * max_nseg + seg + 1];
 		for(int i = start_ind; i < end_ind; i++) {
