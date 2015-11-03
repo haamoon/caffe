@@ -11,13 +11,9 @@
 
 namespace caffe {
 
-
 template <typename Dtype>
 void MaskedPoolingLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
-	
-  	MaskedPoolingParameter maskedpooling_param = this->layer_param_.masked_pooling_param();
-	max_nseg_ = maskedpooling_param.max_segments();
 }
 
 template <typename Dtype>
@@ -27,13 +23,17 @@ void MaskedPoolingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
       << "corresponding to (num, channels, height, width)";
   
   channels_ = bottom[0]->channels();
-  height_ = bottom[0]->height();
-  width_ = bottom[0]->width();
   
+  //bottom[1] is mask with size N_ x mask_lenght
+  mask_lenght_ = bottom[1]->shape(1);
+  //bottom[2] has segmens starting indeces with size N_ x max_nseg_
+  max_nseg_ = bottom[2]->shape(1);
+  
+  //X_t = top is a max_nseg_ x channels_ matrix
   vector<int> top_shape;
   top_shape.push_back(bottom[0]->num());
-  top_shape.push_back(channels_);
   top_shape.push_back(max_nseg_);
+  top_shape.push_back(channels_);
   
   top[0]->Reshape(top_shape);
 }
@@ -61,13 +61,13 @@ void MaskedPoolingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     		int start_ind = seg_inds[seg]; 
     		int end_ind = seg_inds[++seg];
     		for(int i = start_ind; i < end_ind; i++) {
-    			top_data[seg] += image_data[(int)mask_data[i]]/(end_ind - start_ind);
+    			top_data[seg * channels_ + c] += image_data[(int)mask_data[i]]/(end_ind - start_ind);
     		}
     	}
-    	top_data += channels_;
-    	image_data += top[0]->offset(0,1);
+    	image_data += bottom[0]->offset(0,1);
     }  	
     seg_inds += max_nseg_;
+    mask_data += mask_lenght_;
   }
 }
 
@@ -101,20 +101,20 @@ void MaskedPoolingLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
 				int end_ind = seg_inds[++seg];
 				for(int i = start_ind; i < end_ind; i++) {
 					bottom_diff[(int)mask_data[i]] += 
-						top_diff[seg]/(end_ind - start_ind);
+						top_diff[seg * channels_ + c]/(end_ind - start_ind);
 				}
 			}
-			top_diff += channels_;
 			bottom_diff += bottom[0]->offset(0,1);
 		}  	
 		seg_inds += max_nseg_;
+		mask_data += mask_lenght_;
 	}
 }
 
 
-//#ifdef CPU_ONLY
-//STUB_GPU(MaskedPoolingLayer);
-//#endif
+#ifdef CPU_ONLY
+STUB_GPU(MaskedPoolingLayer);
+#endif
 
 INSTANTIATE_CLASS(MaskedPoolingLayer);
 REGISTER_LAYER_CLASS(MaskedPooling);

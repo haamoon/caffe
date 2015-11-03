@@ -753,7 +753,6 @@ message MatMultParameter {
 
 
 message MaskedPoolingParameter {
-	required int32 max_segments = 1;
 }
 
 message MatInvParameter {
