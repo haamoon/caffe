@@ -115,6 +115,7 @@ class MatMultLayerTest : public MultiDeviceTest<TypeParam> {
 TYPED_TEST_CASE(MatMultLayerTest, TestDtypesAndDevices);
 
 
+
 TYPED_TEST(MatMultLayerTest, TestSetUpFTF) {
   typedef typename TypeParam::Dtype Dtype;
   
@@ -242,6 +243,7 @@ TYPED_TEST(MatMultLayerTest, TestMultFF) {
   LOG(INFO) << buffer.str();
 }
 
+
 TYPED_TEST(MatMultLayerTest, TestMultDF) {
   typedef typename TypeParam::Dtype Dtype;
   this->setbottom(true, false);  
@@ -280,6 +282,7 @@ TYPED_TEST(MatMultLayerTest, TestMultDF) {
   }
   LOG(INFO) << buffer.str();
 }
+
 
 TYPED_TEST(MatMultLayerTest, TestMultDD) {
   typedef typename TypeParam::Dtype Dtype;
@@ -341,6 +344,7 @@ TYPED_TEST(MatMultLayerTest, TestGradientFF) {
   checker.CheckGradient(&layer, this->blob_bottom_vec_,
       this->blob_top_vec_);
 }
+
 
 TYPED_TEST(MatMultLayerTest, TestGradientDF) {
   typedef typename TypeParam::Dtype Dtype;
