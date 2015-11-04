@@ -182,7 +182,7 @@ TYPED_TEST(MaskedPoolingLayerTest, TestMaskedPooling) {
   buffer << "Feature Output:" << std::endl;
   this->printMat(buffer, X_data, 3, this->blob_X_->count());
   
-  LOG(ERROR) << buffer.str();
+  LOG(INFO) << buffer.str();
 }
 
 
