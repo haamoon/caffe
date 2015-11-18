@@ -58,7 +58,7 @@ __global__ void RowPoolingBackward(const int nthreads,
     	
     	for(int i = start_ind; i < end_ind; i++) {
     		bottom_diff[n * n_mat_elem + 
-    			(int)seg_data[n * seg_data_len + i] * ncol + col += 
+    			(int)seg_data[n * seg_data_len + i] * ncol + col] += 
 				top_diff(n * max_nseg + seg) * ncol + col] * 
 				seg_coef[n * seg_data_len + i];
     	}
