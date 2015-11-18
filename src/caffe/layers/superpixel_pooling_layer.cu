@@ -34,8 +34,8 @@ __global__ void SuperpixelPoolingForward(const int nthreads,
     	int end_ind = spixel_ptr[1];
      	
      	mask_size += 2 * n;
-     	Dtype h_ratio = image_height_ / mask_size[0];
-  		Dtype w_ratio = image_width_ / mask_size[1]; 
+     	Dtype h_ratio = image_height / mask_size[0];
+  		Dtype w_ratio = image_width / mask_size[1]; 
   	
     	for(int i = start_ind; i < end_ind; i++) {
     		 spixel_data += n * spixel_data_len + i * 2;
@@ -53,7 +53,7 @@ template <typename Dtype>
 __global__ void SuperpixelPoolingBackward(const int nthreads,
     const Dtype* top_diff, const Dtype* spixel_data, const Dtype* spixel_ptr,
     const Dtype* spixel_num, int n_pixel, int image_width, int image_height, 
-    const Dtype* mask_size, int N, int spixel_ptr_len, spixel_data_len,
+    const Dtype* mask_size, int N, int spixel_ptr_len, int spixel_data_len,
     int channels, Dtype* bottom_diff) {
   //nthreads = N_ * channels_ * spixel_num
   CUDA_KERNEL_LOOP(index, nthreads) {  
@@ -69,8 +69,8 @@ __global__ void SuperpixelPoolingBackward(const int nthreads,
     	int end_ind = spixel_ptr[1];
      	
      	mask_size += 2 * n;
-     	Dtype h_ratio = image_height_ / mask_size[0];
-  		Dtype w_ratio = image_width_ / mask_size[1];
+     	Dtype h_ratio = image_height / mask_size[0];
+  		Dtype w_ratio = image_width / mask_size[1];
   	
     	for(int i = start_ind; i < end_ind; i++) {
     	 spixel_data += n * spixel_data_len + i * 2;
