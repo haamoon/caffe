@@ -180,6 +180,83 @@ class MaskedPoolingLayer : public Layer<Dtype> {
   	int mask_lenght_;
 };
 
+
+/**
+ * @brief Pools the input image with respect to the non-overlapping superpixels by taking the average within each superpixel.
+ *
+ */
+ 
+template <typename Dtype>
+class SuperpixelPoolingLayer : public Layer<Dtype> {
+ public:
+  explicit SuperpixelPoolingLayer(const LayerParameter& param)
+      : Layer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "SuperpixelPooling"; }
+  virtual inline int ExactNumBottomBlobs() const { return 5; }
+  virtual inline int ExactNumTopBlobs() const { return 1; }
+
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  private:
+  	int N_;
+  	int channels_;
+  	int image_height_;
+	int image_width_;
+	
+  	int spixel_data_len_;
+  	int spixel_ptr_len_;
+};
+
+
+
+/**
+ * @brief Pools the input rows of with respect to the overlapping set of rows by taking the average.
+ *
+ */
+ 
+template <typename Dtype>
+class RowPoolingLayer : public Layer<Dtype> {
+ public:
+  explicit RowPoolingLayer(const LayerParameter& param)
+      : Layer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "RowPooling"; }
+  virtual inline int ExactNumBottomBlobs() const { return 5; }
+  virtual inline int ExactNumTopBlobs() const { return 1; }
+
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  private:
+  	int N_;
+  	int ncol_;
+  	int nrow_;
+  	int seg_data_len_;
+  	int seg_ptr_len_;
+};
+
 }  // namespace caffe
 
 #endif  // CAFFE_TRACKING_LAYERS_HPP_

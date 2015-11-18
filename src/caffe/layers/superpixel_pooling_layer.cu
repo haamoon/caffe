@@ -15,7 +15,7 @@ template <typename Dtype>
 __global__ void SuperpixelPoolingForward(const int nthreads, 
 	const Dtype* image_data, const Dtype* spixel_data, const Dtype* spixel_ptr,
     const Dtype* spixel_num, int n_pixel, int image_width, int image_height,
-    const Dtype* mask_size, int N, int spixel_ptr_len, spixel_data_len,
+    const Dtype* mask_size, int N, int spixel_ptr_len, int spixel_data_len,
     int channels, Dtype* top_data) {
   
   //nthreads = N_ * channels_ * spixel_num
