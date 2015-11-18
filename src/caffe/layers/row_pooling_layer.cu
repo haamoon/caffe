@@ -80,7 +80,7 @@ void RowPoolingLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
       
   RowPoolingForward<Dtype><<<CAFFE_GET_BLOCKS(top_count), CAFFE_CUDA_NUM_THREADS>>>(
   	top_count, matrix_data, seg_data, seg_ptr, seg_num, bottom[0]->offset(0,1), 
-    ncol_, seg_coef, seg_data_len_, N_, seg_ptr_len - 1, top_data);
+    ncol_, seg_coef, seg_data_len_, N_, seg_ptr_len_ - 1, top_data);
     
 }
 
