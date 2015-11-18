@@ -20,7 +20,7 @@ __global__ void RowPoolingForward(const int nthreads,
   CUDA_KERNEL_LOOP(index, nthreads) {
   	int tmp = index;
   	int n = tmp % N;
-  	int tmp /= N;
+  	tmp /= N;
   	int col = tmp % ncol;
   	int seg = tmp / ncol;
   	
@@ -42,8 +42,8 @@ __global__ void RowPoolingForward(const int nthreads,
 template <typename Dtype>
 __global__ void RowPoolingBackward(const int nthreads,
     const Dtype* top_diff, const Dtype* seg_data, const Dtype* seg_ptr,
-    const Dtype* seg_num, int n_mat_elem, int ncol, int seg_data_len, int max_nseg, 
-    Dtype* bottom_diff) {
+    const Dtype* seg_num, int n_mat_elem, int ncol, const Dtype* seg_coef, 
+    int seg_data_len, int max_nseg, Dtype* bottom_diff) {
   
   //nthreads = N_ * ncol_
   CUDA_KERNEL_LOOP(index, nthreads) {
@@ -108,7 +108,7 @@ void RowPoolingLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   	int count = N_ * ncol_;
     RowPoolingBackward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
   	count, top_diff, seg_data, seg_ptr, seg_num, bottom[0]->offset(0,1), 
-    ncol_, seg_data_len_, seg_ptr_len_ - 1, bottom_diff);
+    ncol_, seg_coef, seg_data_len_, seg_ptr_len_ - 1, bottom_diff);
 }
 
 INSTANTIATE_LAYER_GPU_FUNCS(RowPoolingLayer);
