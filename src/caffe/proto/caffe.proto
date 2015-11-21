@@ -749,6 +749,7 @@ message LRNParameter {
 message MatMultParameter {
 	repeated bool diagonal_input = 1;
 	optional bool transpose_a = 2 [default = false];
+	optional bool transpose_b = 3 [default = false];
 }
 
 

@@ -15,6 +15,7 @@
 #include "caffe/sequence_layers.hpp"
 #include "caffe/proto/caffe.pb.h"
 
+
 namespace caffe {
 /**
  * @brief MatMultLayer. Compute C = AxB it handles the case where either A or B is diagonal.
@@ -62,6 +63,7 @@ class MatMultLayer : public Layer<Dtype> {
   bool A_is_diag_;
   bool B_is_diag_;
   CBLAS_TRANSPOSE A_transpose_;
+  CBLAS_TRANSPOSE B_transpose_;
 };
 
 /**
@@ -256,6 +258,38 @@ class RowPoolingLayer : public Layer<Dtype> {
   	int seg_data_len_;
   	int seg_ptr_len_;
 };
+
+/**
+ * @brief compute the matching segment to each track and assigns values to the 
+ * label vector V with respect to the overlaps of the each segment to each track
+ *
+ */
+ 
+template <typename Dtype>
+class TrackerMatchingLayer : public Layer<Dtype> {
+ public:
+  explicit TrackerMatchingLayer(const LayerParameter& param)
+      : Layer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "TrackerMatching"; }
+  virtual inline int ExactNumBottomBlobs() const { return 2; }
+  virtual inline int ExactNumTopBlobs() const { return 1; }
+
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top) {}
+  Blob<int> max_indeces_; 
+  int N_;
+  int max_nseg_;
+  int max_ntrack_;
+};
+
 
 }  // namespace caffe
 

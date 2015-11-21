@@ -167,7 +167,7 @@ namespace caffe {
             
             
             // Add layers to compute
-            //     hm1_{t-1} := h_{t-1}^{-1}
+            //     hm1_{t-1} := (h_{t-1} + \lambda I)^{-1}
             {
                 LayerParameter* hm1_param = net_param->add_layer();
                 hm1_param->set_type("MatInv");
@@ -178,24 +178,25 @@ namespace caffe {
             }
             
             // Add layers to compute
-            //     w_{t-1} := hm1_{t-1} c_{t-1}
+            //     w_{t-1} := c_{t-1} hm1_{t-1} 
             {
                 LayerParameter* w_param = net_param->add_layer();
                 w_param->CopyFrom(matmult_param);
                 w_param->set_name("w_" + tm1s);
-                w_param->add_bottom("hm1_" + tm1s);
                 w_param->add_bottom("c1_" + tm1s);
+                w_param->add_bottom("hm1_" + tm1s);
                 w_param->add_top("w_" + tm1s);
             }
             
             // Add layer to compute
-            //     v_{t} = X_{t} w_{t-1}
+            //     v'_{t} = w_{t-1} X_{t}^\top
             {
                 LayerParameter* v_param = net_param->add_layer();
                 v_param->CopyFrom(matmult_param);
                 v_param->set_name("v_" + ts);
-                v_param->add_bottom("x_" + ts);
                 v_param->add_bottom("w_" + tm1s);
+                v_param->add_bottom("x_" + ts);
+                v_param->set_transpose_b(true);
                 v_param->add_top("v_" + ts);
             }
             
@@ -223,11 +224,10 @@ namespace caffe {
             }
             
             // Add layers to comput 
-            // 	m_{t} = \phi(v1_{t}) where \phi is 
-            //	row-wise max	  
+            // 	m_{t} = \phi_1(v1_{t}) where \phi_1 is 
+            //	column-wise max	  
             {
-            
-            	//1) Reshape from 1 x _N x num_seg x num_track to _N x num_seg x num_track x 1
+            	//1) Reshape from 1 x _N x num_track x num_seg to _N x 1 x num_track x num_seg
             	LayerParameter* r1_param = net_param->add_layer();
                 r1_param->set_type("Reshape");
                 r1_param->set_name("reshape1_" + ts);
@@ -236,10 +236,12 @@ namespace caffe {
                 BlobShape* r1_top_blob_shape = r1_param->mutable_reshape_param()->mutable_shape();
                 //x input is a T_ x N_ x num_seg x feature_dim_ array
         		const int num_track = this->layer_param_.tracker_param().num_track();
+                CHECK_EQ(num_track, input_blob_shape.dim(2));
                 r1_top_blob_shape->add_dim(input_blob_shape.dim(1));
-                r1_top_blob_shape->add_dim(input_blob_shape.dim(2));
-                r1_top_blob_shape->add_dim(num_track);
                 r1_top_blob_shape->add_dim(1);
+                r1_top_blob_shape->add_dim(num_track);
+                r1_top_blob_shape->add_dim(input_blob_shape.dim(3));
+                
                 
                 
                 //2) Max pooling
@@ -253,7 +255,7 @@ namespace caffe {
                 max_param->add_top("mr_" + ts);
                 
                 
-                //3) Reshape from _N x num_seg x 1 x 1 to 1 x _N x num_seg
+                //3) Reshape from _N x 1 x 1 x num_seg to 1 x _N x num_seg
                 LayerParameter* r2_param = net_param->add_layer();
                 r2_param->set_type("Reshape");
                 r1_param->set_name("reshape2_" + ts);
@@ -262,7 +264,7 @@ namespace caffe {
                 BlobShape* r2_top_blob_shape = r2_param->mutable_reshape_param()->mutable_shape();
                 r2_top_blob_shape->add_dim(1);
                 r2_top_blob_shape->add_dim(input_blob_shape.dim(1));
-                r2_top_blob_shape->add_dim(input_blob_shape.dim(2));
+                r2_top_blob_shape->add_dim(input_blob_shape.dim(3));
             }
             
             // Add layers to split m_{t} to m1_{t} m2_{t}
@@ -318,27 +320,27 @@ namespace caffe {
             }
 
             // Add layers to comput 
-            // 	C_{t} =  cont{t} * C_{t-1} + X_{t}^\top (M_{t} V_{t})	  
+            // 	C_{t} =  cont{t} * C_{t-1} +  v'_t^\top (M_{t} X_{t})	  
             {
-            	//1) MV_{t} = (M_{t} V_{t})	
-            	LayerParameter* mv_param = net_param->add_layer();
-                mv_param->CopyFrom(matmult_param);
-                mv_param->set_name("mv_" + ts);
-                MatMultParameter* mv_matmult_param = mv_param->mutable_matmult_param();
-  				mv_matmult_param->add_diagonal_input(true);
-                mv_param->add_bottom("m2_" + ts);
-                mv_param->add_bottom("v2_" + ts);
-                mv_param->add_top("mv_" + ts);	
+            	//1) MX_{t} = (M_{t} X_{t})	
+            	LayerParameter* mx_param = net_param->add_layer();
+                mx_param->CopyFrom(matmult_param);
+                mx_param->set_name("mx_" + ts);
+                MatMultParameter* mx_matmult_param = mv_param->mutable_matmult_param();
+  				mx_matmult_param->add_diagonal_input(true);
+                mx_param->add_bottom("m2_" + ts);
+                mx_param->add_bottom("x4_" + ts);
+                mx_param->add_top("mx_" + ts);	
             
-            	//2) XMV_{t} = X_{t}^\top MV_{t}
-            	LayerParameter* xmv_param = net_param->add_layer();
-                xmv_param->CopyFrom(matmult_param);
-                MatMultParameter* xmv_matmult_param = xmv_param->mutable_matmult_param();
-                xmv_matmult_param->set_transpose_a(true);
-                xmv_param->set_name("xmv_" + ts);
-                xmv_param->add_bottom("x4_" + ts);
-                xmv_param->add_bottom("mv_" + ts);
-                xmv_param->add_top("xmv_" + ts);
+            	//2) XMV_{t} = v'_{t}^\top MX_{t}
+            	LayerParameter* vmx_param = net_param->add_layer();
+                vmx_param->CopyFrom(matmult_param);
+                MatMultParameter* vmx_matmult_param = vmx_param->mutable_matmult_param();
+                vmx_matmult_param->set_transpose_a(true);
+                vmx_param->set_name("vmx_" + ts);
+                vmx_param->add_bottom("v2_" + ts);
+                vmx_param->add_bottom("mx_" + ts);
+                vmx_param->add_top("vmx_" + ts);
                 
                 
                 //3) C_cont_{t-1} = cont{t} * C_{t-1}
@@ -350,12 +352,12 @@ namespace caffe {
                 c_cont_param->add_top("c_cont_" + tm1s);
                 
                 
-                //4) C_{t} = C_cont_{t-1} + XMV_{t}
+                //4) C_{t} = C_cont_{t-1} + VMX_{t}
                 LayerParameter* update_c_param = net_param->add_layer();
       			update_c_param->CopyFrom(sum_param);
       			update_c_param->set_name("c_" + ts);
       			update_c_param->add_bottom("c_cont_" + tm1s);
-      			update_c_param->add_bottom("xmv_" + ts);
+      			update_c_param->add_bottom("vmx_" + ts);
       			update_c_param->add_top("c_" + ts);
             }
                         

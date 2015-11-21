@@ -29,6 +29,7 @@ void MatMultLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
 	
 	// See if we need to transpose A
 	A_transpose_ = matmult_param.transpose_a() ? CblasTrans : CblasNoTrans;
+	B_transpose_ = matmult_param.transpose_b() ? CblasTrans : CblasNoTrans;
 }
 
 template <typename Dtype>
@@ -69,8 +70,14 @@ void MatMultLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
 	} else {
 		CHECK_GE(a_shape_.size(), 2);
 		b_start_axis = b_shape_.size() - 2;
-		CHECK_EQ(D_2_, b_shape_[b_start_axis]) << "Matrices dimension do not match";
-		D_3_ = b_shape_[b_start_axis + 1];
+		
+		if(B_transpose_ == CblasTrans) {
+		    CHECK_EQ(D_2_, b_shape_[b_start_axis + 1]) << "Matrices dimension do not match";
+			D_3_ = b_shape_[a_start_axis];
+		} else {
+    		CHECK_EQ(D_2_, b_shape_[b_start_axis]) << "Matrices dimension do not match";
+			D_3_ = b_shape_[a_start_axis + 1];
+		}
 		B_offset_ = D_2_ * D_3_;
 	}
 	
@@ -103,20 +110,24 @@ void MatMultLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
 	//handle the case both A and B are full matrices: C = AB
 	if(!A_is_diag_ && !B_is_diag_) {
 		for (int n = 0; n < N_M_; ++n) {
-			caffe_cpu_gemm<Dtype>(A_transpose_, CblasNoTrans, D_1_,
+			caffe_cpu_gemm<Dtype>(A_transpose_, B_tranpose_, D_1_,
     	    	D_3_, D_2_,
     	    	(Dtype)1., A_data + A_offset_ * n, B_data + B_offset_ * n,
     	    	(Dtype)0., C_data + C_offset_ * n);		
 		}
 	}
-	//if A is diagonal we scale each row of B by 
-	//coressponding coefficient in diagonal of A
 	else if(A_is_diag_ && !B_is_diag_) {
-		caffe_copy(N_M_* C_offset_, B_data, C_data);
-		for (int n = 0; n < N_M_; ++n) {
-			for(int r = 0; r < D_2_; ++r) {	
-				caffe_scal(D_3_, A_data[A_offset_ * n + r], C_data + C_offset_ * n + D_3_ * r); 
-			}
+	    caffe_copy(N_M_* C_offset_, B_data, C_data);
+	    if(B_transpose_ == CblasNoTrans) {
+	        //if A is diagonal we scale each row of B by 
+	        //coressponding coefficient in diagonal of A
+		    for (int n = 0; n < N_M_; ++n) {
+			    for(int r = 0; r < D_2_; ++r) {	
+				    caffe_scal(D_3_, A_data[A_offset_ * n + r], C_data + C_offset_ * n + D_3_ * r); 
+			    }
+		    }
+		} else {
+		    LOG(FATAL) << "B can not be transposed while A is diagonal!";    
 		}
 	} else if(!A_is_diag_ && B_is_diag_) {
 		LOG(FATAL) << "B can not be diagonal while A is not diagonal!";		
@@ -140,7 +151,7 @@ void MatMultLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
 	//A' = C' B^\top
 	//B' = A^\top C'
 	if(!A_is_diag_ && !B_is_diag_) {
-		if(A_transpose_ == CblasNoTrans) {
+		if(A_transpose_ == CblasNoTrans && B_transpose_ == CblasNoTrans) {
 			for (int n = 0; n < N_M_; ++n) {
 				if (propagate_down[0]) {
 					caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasTrans, D_1_,
@@ -155,7 +166,7 @@ void MatMultLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
 						(Dtype)0., B_diff + B_offset_ * n);
 		    	}
 		    }
-		} else {
+		} else if(A_transpose_ == CblasTrans && B_transpose_ == CblasNoTrans) {
 			for (int n = 0; n < N_M_; ++n) {
 				if (propagate_down[0]) {
 					caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasTrans, D_2_,
@@ -170,21 +181,55 @@ void MatMultLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
 						(Dtype)0., B_diff + B_offset_ * n);
 				}
 		    }
+		} else if(A_transpose_ == CblasNoTrans && B_transpose_ == CblasTrans) {
+			for (int n = 0; n < N_M_; ++n) {
+				if (propagate_down[0]) {
+					caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, D_1_,
+						D_2_, D_3_, (Dtype)1., 
+						C_diff + C_offset_ * n, B_data + B_offset_ * n,
+						(Dtype)0., A_diff + A_offset_ * n);
+				}
+				if (propagate_down[1]) {
+					caffe_cpu_gemm<Dtype>(CblasTrans, CblasNoTrans, D_3_,
+						D_2_, D_1_, (Dtype)1., 
+						C_diff + C_offset_ * n, A_data + A_offset_ * n,
+						(Dtype)0., B_diff + B_offset_ * n);
+		    	}
+		    }
+		} else if(A_transpose_ == CblasTrans && B_transpose_ == CblasTrans) {
+			for (int n = 0; n < N_M_; ++n) {
+				if (propagate_down[0]) {
+					caffe_cpu_gemm<Dtype>(CblasTrans, CblasTrans, D_2_,
+						D_1_, D_3_,
+						(Dtype)1., B_data + B_offset_ * n, C_diff + C_offset_ * n,
+						(Dtype)0., A_diff + A_offset_ * n);
+				}
+				if (propagate_down[1]) {
+					caffe_cpu_gemm<Dtype>(CblasTrans, CblasTrans, D_3_,
+						D_2_, D_1_, (Dtype)1., 
+						C_diff + C_offset_ * n, A_data + A_offset_ * n, 
+						(Dtype)0., B_diff + B_offset_ * n);
+				}
+		    }
 		}		
 	}
 	else if(A_is_diag_ && !B_is_diag_) {
 		caffe_copy(N_M_* C_offset_, C_diff, B_diff);
-		for (int n = 0; n < N_M_; ++n) {
-			for( int r = 0; r < D_1_; ++r) {
-				if (propagate_down[0]) {
-					A_diff[A_offset_ * n + r] = caffe_cpu_dot(D_3_, C_diff + C_offset_ * n + 
-							D_3_ * r, B_data + B_offset_ * n + D_3_ * r);
-				}
-				if (propagate_down[1]) {  
-					caffe_scal(D_3_, A_data[A_offset_ * n + r], B_diff + B_offset_ * n + D_3_ * r);
-				}
-			}			
-		}
+		if(B_transpose_ == CblasNoTrans) {
+		    for (int n = 0; n < N_M_; ++n) {
+			    for( int r = 0; r < D_1_; ++r) {
+				    if (propagate_down[0]) {
+					    A_diff[A_offset_ * n + r] = caffe_cpu_dot(D_3_, C_diff + C_offset_ * n + 
+							    D_3_ * r, B_data + B_offset_ * n + D_3_ * r);
+				    }
+				    if (propagate_down[1]) {  
+					    caffe_scal(D_3_, A_data[A_offset_ * n + r], B_diff + B_offset_ * n + D_3_ * r);
+				    }
+			    }			
+		    }
+	    } else {
+	        LOG(FATAL) << "B can not be transposed while A is diagonal!";
+	    }
 	} else if(!A_is_diag_ && B_is_diag_) {
 		LOG(FATAL) << "B can not be diagonal while A is not diagonal!";	
 	} else {

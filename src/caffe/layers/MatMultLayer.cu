@@ -58,9 +58,13 @@ void MatMultLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
 	//if A is diagonal we scale each row of B by 
 	//coressponding coefficient in diagonal of A
 	else if(A_is_diag_ && !B_is_diag_) {
-		int count = top[0]->count();
-		ScaleMatRow<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
-        count, B_data, A_data, C_data, D_3_);
+	    if(B_transpose_ == CblasNoTrans) {
+		    int count = top[0]->count();
+		    ScaleMatRow<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
+                count, B_data, A_data, C_data, D_3_);
+		} else {
+		    LOG(FATAL) << "B can not be transposed while A is diagonal!";    
+		}
 	} else if(!A_is_diag_ && B_is_diag_) {
 		LOG(FATAL) << "B can not be diagonal while A is not diagonal!";		
 	} else {
@@ -83,7 +87,7 @@ void MatMultLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
 	//A' = C' B^\top
 	//B' = A^\top C'
 	if(!A_is_diag_ && !B_is_diag_) {
-		if(A_transpose_ == CblasNoTrans) {
+		if(A_transpose_ == CblasNoTrans && B_transpose_ == CblasNoTrans) {
 			for (int n = 0; n < N_M_; ++n) {
 				if (propagate_down[0]) {
 					caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasTrans, D_1_,
@@ -98,7 +102,7 @@ void MatMultLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
 						(Dtype)0., B_diff + B_offset_ * n);
 		    	}
 		    }
-		} else {
+		} else if(A_transpose_ == CblasTrans && B_transpose_ == CblasNoTrans) {
 			for (int n = 0; n < N_M_; ++n) {
 				if (propagate_down[0]) {
 					caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasTrans, D_2_,
@@ -110,6 +114,36 @@ void MatMultLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
 					caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, D_2_,
 						D_3_, D_1_,
 						(Dtype)1., A_data + A_offset_ * n, C_diff + C_offset_ * n,
+						(Dtype)0., B_diff + B_offset_ * n);
+				}
+		    }
+		} else if(A_transpose_ == CblasNoTrans && B_transpose_ == CblasTrans) {
+			for (int n = 0; n < N_M_; ++n) {
+				if (propagate_down[0]) {
+					caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, D_1_,
+						D_2_, D_3_, (Dtype)1., 
+						C_diff + C_offset_ * n, B_data + B_offset_ * n,
+						(Dtype)0., A_diff + A_offset_ * n);
+				}
+				if (propagate_down[1]) {
+					caffe_gpu_gemm<Dtype>(CblasTrans, CblasNoTrans, D_3_,
+						D_2_, D_1_, (Dtype)1., 
+						C_diff + C_offset_ * n, A_data + A_offset_ * n,
+						(Dtype)0., B_diff + B_offset_ * n);
+		    	}
+		    }
+		} else if(A_transpose_ == CblasTrans && B_transpose_ == CblasTrans) {
+			for (int n = 0; n < N_M_; ++n) {
+				if (propagate_down[0]) {
+					caffe_gpu_gemm<Dtype>(CblasTrans, CblasTrans, D_2_,
+						D_1_, D_3_,
+						(Dtype)1., B_data + B_offset_ * n, C_diff + C_offset_ * n,
+						(Dtype)0., A_diff + A_offset_ * n);
+				}
+				if (propagate_down[1]) {
+					caffe_gpu_gemm<Dtype>(CblasTrans, CblasTrans, D_3_,
+						D_2_, D_1_, (Dtype)1., 
+						C_diff + C_offset_ * n, A_data + A_offset_ * n, 
 						(Dtype)0., B_diff + B_offset_ * n);
 				}
 		    }
