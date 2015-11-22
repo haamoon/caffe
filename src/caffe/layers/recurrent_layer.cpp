@@ -99,7 +99,7 @@ void RecurrentLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       this->layer_param_.recurrent_param().debug_info());
 
   // Setup pointers to the inputs.
-  input_blobs_.resize(num_input);
+  input_blobs_.resize(input_size);
   for(int i = 0; i < input_size; i++) {
     input_blobs_[i] = CHECK_NOTNULL(unrolled_net_->blob_by_name(input_names[i]).get());
   }
@@ -227,6 +227,7 @@ void RecurrentLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   }
 }
 
+template <typename Dtype>
 void RecurrentLayer<Dtype>::OutputBlobNames(vector<string>* names) {
   names->resize(1);
   (*names)[0] = "x";
