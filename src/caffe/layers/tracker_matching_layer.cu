@@ -13,7 +13,7 @@ namespace caffe {
 
 template <typename Dtype>
 __global__ void kernel_row_max(const int num, const int max_ntrack,
-    const int max_nseg, const Dtype* v_data, const Dtype* seg_num, Dtype* max_indeces) {
+    const int max_nseg, const Dtype* v_data, const Dtype* seg_num, int* max_indeces) {
   CUDA_KERNEL_LOOP(index, num * max_ntrack) {
     int n = index / max_ntrack;
     int track = index % max_ntrack;
@@ -32,7 +32,7 @@ __global__ void kernel_row_max(const int num, const int max_ntrack,
 
 template <typename Dtype>
 __global__ void kernel_onehot_product(const int num, const int max_ntrack,
-    const int max_nseg, const Dtype* max_indeces, const Dtype* overlap_data, Dtype* top_data) {
+    const int max_nseg, const int* max_indeces, const Dtype* overlap_data, Dtype* top_data) {
   CUDA_KERNEL_LOOP(index, num * max_ntrack * max_nseg) {
  
     int seg = index % max_nseg;
@@ -51,7 +51,7 @@ void TrackerMatchingLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom
   const Dtype* v_data = bottom[0]->gpu_data();
   const Dtype* overlaps_data = bottom[1]->gpu_data();
   const Dtype* seg_num = bottom[2]->gpu_data();  
-	Dtype* max_indeces = max_indeces_.mutable_gpu_data();
+	int* max_indeces = max_indeces_.mutable_gpu_data();
 	Dtype* top_data = top[0]->mutable_cpu_data();
 	
 	kernel_row_max<Dtype><<<CAFFE_GET_BLOCKS(N_ * max_ntrack_),
