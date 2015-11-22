@@ -84,7 +84,7 @@ class RecurrentLayer : public Layer<Dtype> {
    *        all timesteps.  Should return a name for each bottom Blob.
    *        Subclasses may define this -- see TrackerLayer for example.
    */
-  virtual void InputBlobNames(vector<string>* names);
+  virtual void InputBlobNames(vector<string>* names) const;
 
   /**
    * @param bottom input Blob vector (length 2-3)
