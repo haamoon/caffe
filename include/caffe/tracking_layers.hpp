@@ -149,6 +149,7 @@ template <typename Dtype>
     virtual void RecurrentOutputBlobNames(vector<string>* names) const;
     virtual void RecurrentInputShapes(vector<BlobShape>* shapes) const;
     virtual void OutputBlobNames(vector<string>* names) const;
+    virtual void InputBlobNames(vector<string>* names) const;
 };
 
 /**
