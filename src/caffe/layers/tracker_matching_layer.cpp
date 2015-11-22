@@ -37,10 +37,12 @@ void TrackerMatchingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   CHECK_EQ(max_nseg_, bottom[1]->shape(0));
   CHECK_EQ(max_nseg_, bottom[1]->shape(1));
   
-  
-  vector<int> buffer_size;
-  buffer_size.push_back(max_ntrack_);
-  max_indeces_.Reshape(buffer_size);
+  if(Caffe::mode() == Caffe::GPU) {
+    vector<int> buffer_size;
+    buffer_size.push_back(N_);
+    buffer_size.push_back(max_ntrack_);
+    max_indeces_.Reshape(buffer_size);
+  }
   
   top[0]->ReshapeLike(*bottom[0]);
 }
@@ -53,34 +55,20 @@ void TrackerMatchingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom
   const Dtype* seg_num = bottom[2]->cpu_data();
   
   Dtype* top_data = top[0]->mutable_cpu_data();
-  
-  int* max_indeces = max_indeces_.mutable_cpu_data();
-  
-  for(int track = 0; track < max_ntrack_; ++track) {
-  	max_indeces[i] = 0;
-  }
-  
+ 
   for(int n = 0; n < N_; ++n) {
     for(int track = 0; track < max_ntrack_; ++track) {
-        for(int seg = 1; seg < seg_num[n]; ++seg) {
-            if(v_data[*max_indeces] < v_data[seg]) {
-                *max_indeces = seg;
-  		    }  		
-  		    max_indeces += 1;
-  		    v_data += max_nseg_;
-  		}
+      int max_index = 0;
+      for(int seg = 1; seg < seg_num[n]; ++seg) {
+        if(v_data[max_index] < v_data[seg]) {
+          max_index = seg;
+  		    }
+  		  }
+  		  caffe_copy(max_nseg_, overlaps_data + max_index * max_nseg_, top_data);
+  		  v_data += max_nseg_;
+  		  top_data += max_nseg_;
+  	  }
   	}
-  	max_indeces -= max_ntrack_;
-  	for(int track = 0; track < max_ntrack_; ++track) {
-        for(int seg = 1; seg < max_nseg; ++seg) {
-            top_data[seg] = overlaps_data[*max_indeces * max_nseg_ + seg];    
-        }
-        *max_indeces = 0;
-        max_indeces += 1;
-        top_data += max_nseg_;
-    }
-    max_indeces -= max_ntrack_;
-  }
 }
 
 #ifdef CPU_ONLY
