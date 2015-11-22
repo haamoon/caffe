@@ -1025,10 +1025,10 @@ message TrackerParameter {
   optional float lambda = 3 [default = .5];
   
   // Use softmax in the refinement layer (default hardmax)
-  optional bool use_softmax = 4 [default = false] 
+  optional bool use_softmax = 4 [default = false]; 
   
   // Use vtilde to update C_t, use_softmax should be true(?)
-  optional bool use_vtilde_in_c = 5 [default = false]
+  optional bool use_vtilde_in_c = 5 [default = false];
 }
 
 
