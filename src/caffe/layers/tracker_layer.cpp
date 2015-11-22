@@ -52,10 +52,19 @@ namespace caffe {
     
     template <typename Dtype>
     void TrackerLayer<Dtype>::OutputBlobNames(vector<string>* names) const {
-        names->resize(1);
+        names->resize(2);
         (*names)[0] = "v";
+        (*names)[1] = "vtilde";
     }
     
+    template <typename Dtype>
+    void TrackerLayer<Dtype>::InputBlobNames(vector<string>* names) const {
+        names->resize(2);
+        (*names)[0] = "x";
+        (*names)[1] = "overlaps";
+        (*names)[1] = "seg_num";
+    }
+        
     template <typename Dtype>
     void TrackerLayer<Dtype>::FillUnrolledNet(NetParameter* net_param) const {
 
@@ -83,7 +92,7 @@ namespace caffe {
         //fucntion is defined as constant. So, I set it mannually
         //in RecurrentInputShapes proto.
         //initialize feature_dim_ before calling RecurrentInputShapes
-        //x input is a T_ x N_ x num_seg x feature_dim_ array
+        //x input is a T_ x N_ x (num_seg x feature_dim_) array
         CHECK_GE(net_param->input_size(), 1);
         CHECK_EQ(net_param->input(0).compare("x"), 0);
         const BlobShape input_blob_shape = net_param->input_shape(0); 
@@ -108,11 +117,31 @@ namespace caffe {
         x_slice_param->set_name("x_slice");
         x_slice_param->add_bottom("x");
         
+        LayerParameter* overlaps_slice_param = net_param->add_layer();
+        overlaps_slice_param->CopyFrom(slice_param);
+        overlaps_slice_param->set_name("overlaps_slice");
+        overlaps_slice_param->add_bottom("overlaps");
+        
+        LayerParameter* nseg_slice_param = net_param->add_layer();
+        nseg_slice_param->CopyFrom(slice_param);
+        nseg_slice_param->set_name("seg_num_slice");
+        nseg_slice_param->add_bottom("seg_num");
+        
+        
         LayerParameter output_concat_layer;
         output_concat_layer.set_name("v_concat");
         output_concat_layer.set_type("Concat");
         output_concat_layer.add_top("v");
         output_concat_layer.mutable_concat_param()->set_axis(0);
+        
+        
+        
+        LayerParameter vtilde_concat_layer;
+        vtilde_concat_layer.set_name("vtilde_concat");
+        vtilde_concat_layer.set_type("Concat");
+        vtilde_concat_layer.add_top("vtilde");
+        vtilde_concat_layer.mutable_concat_param()->set_axis(0);
+        
         
         for (int t = 1; t <= this->T_; ++t) {
             string tm1s = this->int_to_str(t - 1);
@@ -120,6 +149,8 @@ namespace caffe {
             
             cont_slice_param->add_top("cont_" + ts);
             x_slice_param->add_top("x_" + ts);
+            overlaps_slice_param->add_top("overlaps_" + ts);
+            nseg_slice_param->add_top("nseg_" + ts);
             
             // Add layers to split x_{t} to xi_{t} i = 1,2,3,4
             {
@@ -162,7 +193,7 @@ namespace caffe {
                 c_split_param->set_name("c_split_" + tm1s);
                 c_split_param->add_bottom("c_" + tm1s);
                 c_split_param->add_top("c1_" + tm1s);
-            	c_split_param->add_top("c2_" + tm1s);
+                c_split_param->add_top("c2_" + tm1s);
             }
             
             
@@ -211,16 +242,38 @@ namespace caffe {
                 v_cont_param->add_top("v_cont_" + ts);
             }
             
+            
             // Add layers to copy v_cont_{t} 3 times 
-            //     v1_{t}, v2_{t}, v3_{t},  
+            //     v1_{t}, v2_{t}, v3_{t}, v4_{t}
             {
                 LayerParameter* v_split_param = net_param->add_layer();
                 v_split_param->set_type("Split");
                 v_split_param->set_name("v_split_" + ts);
                 v_split_param->add_bottom("v_cont_" + ts);
+                // for computing m_{t}
                 v_split_param->add_top("v1_" + ts);
-            	v_split_param->add_top("v2_" + ts);
-            	v_split_param->add_top("v3_" + ts);
+                // for computing C_{t}
+                v_split_param->add_top("v2_" + ts);
+                // for computing output V
+                v_split_param->add_top("v3_" + ts);
+                // for computing vtilde
+                v_split_param->add_top("v4_" + ts);                
+            }
+            
+            // Add layers to calculate v_tilde_{t}
+            {
+              if(this->layer_param_.tracker_param().use_softmax()) {
+                NOT_IMPLEMENTED;
+              } else {
+                LayerParameter* v_tilde_param = net_param->add_layer();
+                v_tilde_param->set_type("TrackerMaching");
+                v_tilde_param->set_name("vtilde_" + ts);
+                v_tilde_param->add_bottom("v4_" + ts);
+                v_tilde_param->add_bottom("overlaps_" + ts);                
+                v_tilde_param->add_bottom("nseg_" + ts);
+                                
+                v_tilde_param->add_top("vtilde_" + ts);
+              }
             }
             
             // Add layers to comput 
@@ -236,13 +289,10 @@ namespace caffe {
                 BlobShape* r1_top_blob_shape = r1_param->mutable_reshape_param()->mutable_shape();
                 //x input is a T_ x N_ x num_seg x feature_dim_ array
         		const int num_track = this->layer_param_.tracker_param().num_track();
-                CHECK_EQ(num_track, input_blob_shape.dim(2));
                 r1_top_blob_shape->add_dim(input_blob_shape.dim(1));
                 r1_top_blob_shape->add_dim(1);
                 r1_top_blob_shape->add_dim(num_track);
                 r1_top_blob_shape->add_dim(input_blob_shape.dim(3));
-                
-                
                 
                 //2) Max pooling
                 LayerParameter* max_param = net_param->add_layer();
@@ -327,7 +377,7 @@ namespace caffe {
                 mx_param->CopyFrom(matmult_param);
                 mx_param->set_name("mx_" + ts);
                 MatMultParameter* mx_matmult_param = mx_param->mutable_matmult_param();
-  				mx_matmult_param->add_diagonal_input(true);
+        				 mx_matmult_param->add_diagonal_input(true);
                 mx_param->add_bottom("m2_" + ts);
                 mx_param->add_bottom("x4_" + ts);
                 mx_param->add_top("mx_" + ts);	
@@ -360,7 +410,7 @@ namespace caffe {
       			update_c_param->add_bottom("vmx_" + ts);
       			update_c_param->add_top("c_" + ts);
             }
-                        
+            vtilde_concat_layer.add_bottom("vtilde_" + ts);
             output_concat_layer.add_bottom("v3_" + ts);
         }  // for (int t = 1; t <= this->T_; ++t)
         

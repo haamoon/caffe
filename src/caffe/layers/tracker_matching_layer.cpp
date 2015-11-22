@@ -19,23 +19,25 @@ void TrackerMatchingLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
 template <typename Dtype>
 void TrackerMatchingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
-  CHECK_EQ(3, bottom[0]->num_axes()) << "Input(0) segment ranks should have 3 axis, "
-      << "corresponding to (num, track_id, segment_id)";
-  CHECK_EQ(3, bottom[1]->num_axes()) << "Input(1) segment overlaps should have 3 axis, "
-      << "corresponding to (num, segment_id, segment_id)";
+  CHECK_GE(bottom[0]->num_axes(), 2) << "Input(0) segment ranks should have at least 2 axis, "
+      << "corresponding to (..., track_id, segment_id)";
+  CHECK_GE(bottom[1]->num_axes(), 2) << "Input(1) segment overlaps should have at least 2 axis, "
+      << "corresponding to (..., segment_id, segment_id)";
       
-  CHECK_EQ(3, bottom[2]->num_axes()) << "Input(2) segment number should have 1 axis, "
-      << "corresponding to (num)";
+  CHECK_GE(1, bottom[2]->num_axes()) << "Input(2) segment number should have at least 1 axis";
   
-  N_ = bottom[0]->shape(0);
-  max_nseg_ = bottom[0]->shape(2);
-  max_ntrack_ = bottom[0]->shape(1);
-    
-  CHECK_EQ(N_, bottom[1]->shape(0));
-  CHECK_EQ(N_, bottom[2]->shape(0));
+  vector<int> v_shape = bottom[0]->shape();
+  int input_start_axis = input_shape_.size() - 2;
+  N_ = bottom[0]->count(0, input_start_axis);
+
+  max_ntrack_ = bottom[0]->shape(input_start_axis);
+  max_nseg_ = bottom[0]->shape(input_start_axis + 1);
+      
+  CHECK_EQ(N_, bottom[1]->count(0, input_start_axis));
+  CHECK_EQ(N_, bottom[2]->count());
   
-  CHECK_EQ(max_nseg_, bottom[1]->shape(0));
-  CHECK_EQ(max_nseg_, bottom[1]->shape(1));
+  CHECK_EQ(max_nseg_, bottom[1]->shape(input_start_axis));
+  CHECK_EQ(max_nseg_, bottom[1]->shape(input_start_axis + 1));
   
   if(Caffe::mode() == Caffe::GPU) {
     vector<int> buffer_size;
