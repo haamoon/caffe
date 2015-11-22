@@ -228,7 +228,7 @@ void RecurrentLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
 }
 
 template <typename Dtype>
-void RecurrentLayer<Dtype>::OutputBlobNames(vector<string>* names) {
+void RecurrentLayer<Dtype>::InputBlobNames(vector<string>* names) {
   names->resize(1);
   (*names)[0] = "x";
 }
