@@ -70,6 +70,7 @@ class RecurrentLayer : public Layer<Dtype> {
    */
   virtual void RecurrentOutputBlobNames(vector<string>* names) const = 0;
 
+
   /**
    * @brief Fills names with the names of the output blobs, concatenated across
    *        all timesteps.  Should return a name for each top Blob.
@@ -77,6 +78,13 @@ class RecurrentLayer : public Layer<Dtype> {
    *        examples.
    */
   virtual void OutputBlobNames(vector<string>* names) const = 0;
+
+  /**
+   * @brief Fills names with the names of the input blobs, concatenated across
+   *        all timesteps.  Should return a name for each bottom Blob.
+   *        Subclasses may define this -- see TrackerLayer for example.
+   */
+  virtual void InputBlobNames(vector<string>* names);
 
   /**
    * @param bottom input Blob vector (length 2-3)
@@ -151,7 +159,7 @@ class RecurrentLayer : public Layer<Dtype> {
   vector<Blob<Dtype>* > recur_input_blobs_;
   vector<Blob<Dtype>* > recur_output_blobs_;
   vector<Blob<Dtype>* > output_blobs_;
-  Blob<Dtype>* x_input_blob_;
+  vector<Blob<Dtype>* > input_blobs_;
   Blob<Dtype>* x_static_input_blob_;
   Blob<Dtype>* cont_input_blob_;
 };

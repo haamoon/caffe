@@ -20,48 +20,61 @@ string RecurrentLayer<Dtype>::int_to_str(const int t) const {
 template <typename Dtype>
 void RecurrentLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
-  CHECK_GE(bottom[0]->num_axes(), 2)
-      << "bottom[0] must have at least 2 axes -- (#timesteps, #streams, ...)";
-  T_ = bottom[0]->shape(0);
-  N_ = bottom[0]->shape(1);
+  
+  vector<string> input_names;
+  InputBlobNames(&input_names);
+  
+  int input_size = input_names.size();
+  
+  CHECK_EQ(bottom[input_size]->num_axes(), 2)
+      << "bottom[" << input_size << "] (cont) must have exactly 2 axes -- (#timesteps, #streams)";
+  
+  T_ = bottom[input_size]->shape(0);
+  N_ = bottom[input_size]->shape(1);
+  
+  for( int i = 0; i < input_size; i++) {
+    CHECK_GE(bottom[i]->num_axes(), 2)
+        << "bottom[" << i << "] must have at least 2 axes -- (#timesteps, #streams, ...)";
+    CHECK_EQ(T_, bottom[i]->shape(0));
+    CHECK_EQ(N_, bottom[i]->shape(1));
+  }
+  
   LOG(INFO) << "Initializing recurrent layer: assuming input batch contains "
             << T_ << " timesteps of " << N_ << " independent streams.";
 
-  CHECK_EQ(bottom[1]->num_axes(), 2)
-      << "bottom[1] must have exactly 2 axes -- (#timesteps, #streams)";
-  CHECK_EQ(T_, bottom[1]->shape(0));
-  CHECK_EQ(N_, bottom[1]->shape(1));
 
   // If provided, bottom[2] is a static input to the recurrent net.
-  static_input_ = (bottom.size() > 2);
+  static_input_ = (bottom.size() > input_size + 1);
   if (static_input_) {
-    CHECK_GE(bottom[2]->num_axes(), 1);
-    CHECK_EQ(N_, bottom[2]->shape(0));
+    CHECK_GE(bottom[input_size + 1]->num_axes(), 1);
+    CHECK_EQ(N_, bottom[input_size + 1]->shape(0));
   }
 
   // Create a NetParameter; setup the inputs that aren't unique to particular
   // recurrent architectures.
   NetParameter net_param;
   net_param.set_force_backward(true);
-
-  net_param.add_input("x");
+  
   BlobShape input_shape;
-  for (int i = 0; i < bottom[0]->num_axes(); ++i) {
-    input_shape.add_dim(bottom[0]->shape(i));
+  for(int i = 0; i < input_size; i++) {
+    net_param.add_input(input_names[i]);
+    for (int j = 0; j < bottom[i]->num_axes(); ++j) {
+      input_shape.add_dim(bottom[i]->shape(j));
+    }
+    net_param.add_input_shape()->CopyFrom(input_shape);
+    input_shape.Clear();  
   }
-  net_param.add_input_shape()->CopyFrom(input_shape);
-
-  input_shape.Clear();
-  for (int i = 0; i < bottom[1]->num_axes(); ++i) {
-    input_shape.add_dim(bottom[1]->shape(i));
+  
+  for (int i = 0; i < bottom[input_size]->num_axes(); ++i) {
+    input_shape.add_dim(bottom[input_size]->shape(i));
   }
   net_param.add_input("cont");
   net_param.add_input_shape()->CopyFrom(input_shape);
 
   if (static_input_) {
     input_shape.Clear();
-    for (int i = 0; i < bottom[2]->num_axes(); ++i) {
-      input_shape.add_dim(bottom[2]->shape(i));
+    for (int i = 0; i < bottom[input_size + 1]->num_axes(); ++i) {
+      input_shape.add_dim(bottom[input_size + 1]->shape(i));
     }
     net_param.add_input("x_static");
     net_param.add_input_shape()->CopyFrom(input_shape);
@@ -86,7 +99,10 @@ void RecurrentLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       this->layer_param_.recurrent_param().debug_info());
 
   // Setup pointers to the inputs.
-  x_input_blob_ = CHECK_NOTNULL(unrolled_net_->blob_by_name("x").get());
+  input_blobs_.resize(num_input);
+  for(int i = 0; i < input_size; i++) {
+    input_blobs_[i] = CHECK_NOTNULL(unrolled_net_->blob_by_name(input_names[i]).get());
+  }
   cont_input_blob_ = CHECK_NOTNULL(unrolled_net_->blob_by_name("cont").get());
   if (static_input_) {
     x_static_input_blob_ =
@@ -120,9 +136,9 @@ void RecurrentLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
         CHECK_NOTNULL(unrolled_net_->blob_by_name(output_names[i]).get());
   }
 
-  // We should have 2 inputs (x and cont), plus a number of recurrent inputs,
+  // We should have input_size + 1 inputs (input_names and cont), plus a number of recurrent inputs,
   // plus maybe a static input.
-  CHECK_EQ(2 + num_recur_blobs + static_input_,
+  CHECK_EQ(input_size + num_recur_blobs + static_input_,
            unrolled_net_->input_blobs().size());
 
   // This layer's parameters are any parameters in the layers of the unrolled
@@ -158,21 +174,33 @@ void RecurrentLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
 template <typename Dtype>
 void RecurrentLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
-  CHECK_GE(bottom[0]->num_axes(), 2)
-      << "bottom[0] must have at least 2 axes -- (#timesteps, #streams, ...)";
-  CHECK_EQ(T_, bottom[0]->shape(0)) << "input number of timesteps changed";
-  N_ = bottom[0]->shape(1);
-  CHECK_EQ(bottom[1]->num_axes(), 2)
-      << "bottom[1] must have exactly 2 axes -- (#timesteps, #streams)";
-  CHECK_EQ(T_, bottom[1]->shape(0));
-  CHECK_EQ(N_, bottom[1]->shape(1));
+
+  
+  int input_size = input_blobs_.size();
+  
+  CHECK_EQ(bottom[input_size]->num_axes(), 2)
+      << "bottom[" << input_size << "] (cont) must have exactly 2 axes -- (#timesteps, #streams)";
+  
+  CHECK_EQ(T_, bottom[input_size]->shape(0)) << "input number of timesteps changed";
+  N_ = bottom[input_size]->shape(1);
   CHECK_EQ(top.size(), output_blobs_.size());
-  x_input_blob_->ReshapeLike(*bottom[0]);
-  vector<int> cont_shape = bottom[1]->shape();
+  
+  for( int i = 0; i < input_size; i++) {
+    CHECK_GE(bottom[i]->num_axes(), 2)
+        << "bottom[" << i << "] must have at least 2 axes -- (#timesteps, #streams, ...)";
+    CHECK_EQ(T_, bottom[i]->shape(0));
+    CHECK_EQ(N_, bottom[i]->shape(1));
+    input_blobs_[i]->ReshapeLike(*bottom[i]);
+  }
+  
+  
+  
+  vector<int> cont_shape = bottom[input_size]->shape();
   cont_input_blob_->Reshape(cont_shape);
   if (static_input_) {
-    x_static_input_blob_->ReshapeLike(*bottom[2]);
+    x_static_input_blob_->ReshapeLike(*bottom[input_size + 1]);
   }
+  
   vector<BlobShape> recur_input_shapes;
   RecurrentInputShapes(&recur_input_shapes);
   CHECK_EQ(recur_input_shapes.size(), recur_input_blobs_.size());
@@ -180,18 +208,28 @@ void RecurrentLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
     recur_input_blobs_[i]->Reshape(recur_input_shapes[i]);
   }
   unrolled_net_->Reshape();
-  x_input_blob_->ShareData(*bottom[0]);
-  x_input_blob_->ShareDiff(*bottom[0]);
-  cont_input_blob_->ShareData(*bottom[1]);
-  if (static_input_) {
-    x_static_input_blob_->ShareData(*bottom[2]);
-    x_static_input_blob_->ShareDiff(*bottom[2]);
+  
+  for( int i = 0; i < input_size; i++) {
+    input_blobs_[i]->ShareData(*bottom[i]);
+    input_blobs_[i]->ShareDiff(*bottom[i]);
   }
+  
+  cont_input_blob_->ShareData(*bottom[input_size]);
+  if (static_input_) {
+    x_static_input_blob_->ShareData(*bottom[input_size + 1]);
+    x_static_input_blob_->ShareDiff(*bottom[input_size + 1]);
+  }
+  
   for (int i = 0; i < top.size(); ++i) {
     top[i]->ReshapeLike(*output_blobs_[i]);
     top[i]->ShareData(*output_blobs_[i]);
     top[i]->ShareDiff(*output_blobs_[i]);
   }
+}
+
+void RecurrentLayer<Dtype>::OutputBlobNames(vector<string>* names) {
+  names->resize(1);
+  (*names)[0] = "x";
 }
 
 template <typename Dtype>

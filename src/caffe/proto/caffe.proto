@@ -1021,8 +1021,14 @@ message TrackerParameter {
   required int32 feature_dim = 2;
   
   
-  // Lambda value in the inversion
+  // Lambda value in the inversion unit
   optional float lambda = 3 [default = .5];
+  
+  // Use softmax in the refinement layer (default hardmax)
+  optional bool use_softmax = 4 [default = false] 
+  
+  // Use vtilde to update C_t, use_softmax should be true(?)
+  optional bool use_vtilde_in_c = 5 [default = false]
 }
 
 
