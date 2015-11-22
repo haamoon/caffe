@@ -17,7 +17,6 @@ __global__ void kernel_row_max(const int num, const int max_ntrack,
   CUDA_KERNEL_LOOP(index, num * max_ntrack) {
     int n = index / max_ntrack;
     int track = index % max_ntrack;
-    Dtype maxval = -FLT_MAX;
     max_indeces += index;
     *max_indeces = 0; 
     v_data += (n * max_ntrack + track) * max_nseg;
