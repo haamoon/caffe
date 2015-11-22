@@ -26,8 +26,7 @@ void TrackerMatchingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
       
   CHECK_GE(1, bottom[2]->num_axes()) << "Input(2) segment number should have at least 1 axis";
   
-  vector<int> v_shape = bottom[0]->shape();
-  int input_start_axis = input_shape_.size() - 2;
+  int input_start_axis = bottom[0]->num_axes() - 2;
   N_ = bottom[0]->count(0, input_start_axis);
 
   max_ntrack_ = bottom[0]->shape(input_start_axis);
