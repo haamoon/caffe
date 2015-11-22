@@ -28,7 +28,6 @@ __global__ void kernel_row_max(const int num, const int max_ntrack,
   }
 }
 
-
 template <typename Dtype>
 __global__ void kernel_onehot_product(const int num, const int max_ntrack,
     const int max_nseg, const int* max_indeces, const Dtype* overlap_data, Dtype* top_data) {
@@ -62,6 +61,7 @@ void TrackerMatchingLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom
       overlaps_data, top_data);
 }
 
-INSTANTIATE_LAYER_GPU_FUNCS(TrackerMatchingLayer);
+
+INSTANTIATE_LAYER_GPU_FORWARD(TrackerMatchingLayer);
 
 }  // namespace caffe
