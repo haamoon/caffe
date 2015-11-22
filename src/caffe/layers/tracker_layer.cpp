@@ -196,7 +196,7 @@ namespace caffe {
                 v_param->set_name("v_" + ts);
                 v_param->add_bottom("w_" + tm1s);
                 v_param->add_bottom("x_" + ts);
-                v_param->set_transpose_b(true);
+                v_param->mutable_matmult_param()->set_transpose_b(true);
                 v_param->add_top("v_" + ts);
             }
             
@@ -326,7 +326,7 @@ namespace caffe {
             	LayerParameter* mx_param = net_param->add_layer();
                 mx_param->CopyFrom(matmult_param);
                 mx_param->set_name("mx_" + ts);
-                MatMultParameter* mx_matmult_param = mv_param->mutable_matmult_param();
+                MatMultParameter* mx_matmult_param = mx_param->mutable_matmult_param();
   				mx_matmult_param->add_diagonal_input(true);
                 mx_param->add_bottom("m2_" + ts);
                 mx_param->add_bottom("x4_" + ts);
