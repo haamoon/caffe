@@ -261,6 +261,7 @@ class RowPoolingLayer : public Layer<Dtype> {
   	int nrow_;
   	int seg_data_len_;
   	int seg_ptr_len_;
+	int start_axes_;
 };
 
 /**
