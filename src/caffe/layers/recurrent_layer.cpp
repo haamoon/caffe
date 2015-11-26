@@ -42,7 +42,6 @@ void RecurrentLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   LOG(INFO) << "Initializing recurrent layer: assuming input batch contains "
             << T_ << " timesteps of " << N_ << " independent streams.";
 
-
   // If provided, bottom[2] is a static input to the recurrent net.
   static_input_ = (bottom.size() > input_size + 1);
   if (static_input_) {
@@ -138,7 +137,7 @@ void RecurrentLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
 
   // We should have input_size + 1 inputs (input_names and cont), plus a number of recurrent inputs,
   // plus maybe a static input.
-  CHECK_EQ(input_size + num_recur_blobs + static_input_,
+  CHECK_EQ(input_size + 1 + num_recur_blobs + static_input_,
            unrolled_net_->input_blobs().size());
 
   // This layer's parameters are any parameters in the layers of the unrolled

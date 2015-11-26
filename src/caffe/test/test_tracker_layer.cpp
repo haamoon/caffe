@@ -19,13 +19,12 @@ class TrackerLayerTest : public MultiDeviceTest<TypeParam> {
 
  protected:
   TrackerLayerTest() {
-  	x_ = NULL;
+	x_ = NULL;
+  	overlaps_ = NULL;
+  	seg_num_ = NULL;
   	cont_ = NULL;
-  	h_0_ = NULL;
-  	c_0_ = NULL;
-  	h_T_ = NULL;
-  	c_T_ = NULL;
   	v_ = NULL;
+        vtilde_ = NULL;
   }
   
   void clear() {
@@ -35,32 +34,22 @@ class TrackerLayerTest : public MultiDeviceTest<TypeParam> {
     	x_shape_.clear();	
     }
     
+    if(overlaps_ != NULL) {
+        delete overlaps_;
+        overlaps_ = NULL;
+        overlaps_shape_.clear();
+    }
+    
+    if(seg_num_ != NULL) {
+      delete seg_num_;
+      seg_num_ = NULL;
+      seg_num_shape_.clear();
+    }
+      
     if(cont_ != NULL) {
     	delete x_;
     	cont_ = NULL;
     	cont_shape_.clear();	
-    }
-    
-    if( h_0_ != NULL) {
-    	delete h_0_;
-    	h_0_ = NULL;
-    	h_0_shape_.clear();
-    }
-    
-    if(c_0_ != NULL) {
-    	delete c_0_;
-    	c_0_ = NULL;
-    	c_0_shape_.clear();
-    }
-    
-    if(h_T_ != NULL) {
-    	delete h_T_;
-    	h_T_ = NULL;
-    }
-    
-    if( c_T_ != NULL) {
-    	delete  c_T_;
-    	 c_T_ = NULL;
     }
     
     if(v_ != NULL) {
@@ -68,22 +57,27 @@ class TrackerLayerTest : public MultiDeviceTest<TypeParam> {
     	v_ = NULL;
     }
     
+    if(vtilde_ != NULL) {
+      delete vtilde_;
+      vtilde_ = NULL;
+    }
+    
+    
     blob_bottom_vec_.clear();
     blob_top_vec_.clear();
   }
   
   
   void setbottom(vector<int> x_shape, int num_track = 5, float lambda = .5) {
-	
-	TrackerParameter* tracker_param = layer_param_.mutable_tracker_param();
-  	tracker_param->set_lambda(lambda);
-	tracker_param->set_num_track(num_track);
-	tracker_param->set_feature_dim(x_shape[3]);
-	
-	this->num_track_ = num_track;
-	this->clear();
+    TrackerParameter* tracker_param = layer_param_.mutable_tracker_param();
+    tracker_param->set_lambda(lambda);
+    tracker_param->set_num_track(num_track);
+    tracker_param->set_feature_dim(x_shape[3]);
+    this->num_track_ = num_track;
+    this->clear();
 
-	// fill the values
+    
+    // fill the values
     Caffe::set_random_seed(1101);
     
     FillerParameter filler_param;
@@ -96,45 +90,53 @@ class TrackerLayerTest : public MultiDeviceTest<TypeParam> {
     cont_shape_.push_back(x_shape_[0]);
     cont_shape_.push_back(x_shape_[1]);
     
-    //h_0_shape_: 1 x N x num_dim x num_dim
-    h_0_shape_.push_back(1);
-    h_0_shape_.push_back(x_shape_[1]);
-    h_0_shape_.push_back(x_shape_[3]);
-    h_0_shape_.push_back(x_shape_[3]);
+    //seg_num_shape_: T x N
+    seg_num_shape_.push_back(x_shape_[0]);
+    seg_num_shape_.push_back(x_shape_[1]);
     
-    //c_0_shape_: 1 x N x num_dim x num_track 
-    c_0_shape_.push_back(1);
-    c_0_shape_.push_back(x_shape_[1]);
-    c_0_shape_.push_back(x_shape_[3]);
-    c_0_shape_.push_back(num_track);
+    //overlaps_shape_: T X N X num_seg X num_seg
+    overlaps_shape_.push_back(x_shape_[0]);
+    overlaps_shape_.push_back(x_shape_[1]);
+    overlaps_shape_.push_back(x_shape_[2]);
+    overlaps_shape_.push_back(x_shape_[2]);
+    
     
     x_ = new Blob<Dtype>(x_shape);
+    overlaps_ = new Blob<Dtype>(overlaps_shape_);
+    seg_num_ = new Blob<Dtype>(seg_num_shape_);
     cont_ = new Blob<Dtype>(cont_shape_);
-    //h_0_ = new Blob<Dtype>(h_0_shape_);
-    //c_0_ = new Blob<Dtype>(c_0_shape_);
-    //h_T_ = new Blob<Dtype>();
-    //c_T_ = new Blob<Dtype>();
+    
     v_ = new Blob<Dtype>();
+    vtilde_ = new Blob<Dtype>();
     
     filler.Fill(x_);
-    //filler.Fill(c_0_);
-    //filler.Fill(h_0_);
+    
+    Dtype* overlap_data = overlaps_->mutable_cpu_data();
+    
+    for(int i = 0; i < x_shape_[2] * x_shape_[0] * x_shape_[1]; i++) {
+      for(int j = 0; j < x_shape_[2]; j++) {
+          overlap_data[i * x_shape_[2] + j] = i;
+      }
+    }
+    
     
     Dtype* cont_data = cont_->mutable_cpu_data();
+    Dtype* seg_num_data = seg_num_->mutable_cpu_data();
     for(int t = 0; t < x_shape_[0]; ++t) {
     	for(int n = 0; n < x_shape_[1]; n++) {
-    		cont_data[ t * x_shape_[1] + n ] = (t == 0 
-    		//|| t == (x_shape_[0] - 1) / 2
-    		) ? (Dtype).0 : (Dtype)1.0;
-    	}
+	  cont_data[ t * x_shape_[1] + n ] = (t == 0 
+	  //|| t == (x_shape_[0] - 1) / 2
+	  ) ? (Dtype).0 : (Dtype)1.0;
+	  seg_num_data[ t * x_shape_[1] + n ] = x_shape_[2];
+	}
     }
     
     blob_bottom_vec_.push_back(x_);
-    blob_bottom_vec_.push_back(cont_);
-    //blob_bottom_vec_.push_back(c_0_);
-	//blob_bottom_vec_.push_back(h_0_);
-	
-	blob_top_vec_.push_back(v_);
+    blob_bottom_vec_.push_back(overlaps_);
+    blob_bottom_vec_.push_back(seg_num_);
+    blob_bottom_vec_.push_back(cont_);	
+    blob_top_vec_.push_back(v_);
+    blob_top_vec_.push_back(vtilde_);
   }
   
   
@@ -144,30 +146,30 @@ class TrackerLayerTest : public MultiDeviceTest<TypeParam> {
   
   template <typename Dtype>
   void printMat(std::stringstream& buffer, Dtype* mat, int col, int count) {
-	for (int i = 0; i < count; ++i) {
-  		if(i % col == 0) {
-  			buffer << ';' << endl;
-  		}
-		buffer << mat[i] << ' ';    
+        buffer << std::fixed << std::setprecision(5);
+        for (int i = 0; i < count; ++i) {
+          if(i % col == 0) {
+            buffer << ';' << endl;
+          }
+          buffer << std::setw(10) << mat[i] << ' ';    
   	}
-  		buffer << endl;
+  	buffer << endl;
   }
 
   Blob<Dtype>* x_;
+  Blob<Dtype>* overlaps_;
+  Blob<Dtype>* seg_num_;
   Blob<Dtype>* cont_;
-  Blob<Dtype>* h_0_;
-  Blob<Dtype>* c_0_;
-  Blob<Dtype>* h_T_;
-  Blob<Dtype>* c_T_;
   Blob<Dtype>* v_;
+  Blob<Dtype>* vtilde_;
   
   vector<Blob<Dtype>*> blob_bottom_vec_;
   vector<Blob<Dtype>*> blob_top_vec_;
   
   vector<int> x_shape_;
+  vector<int> overlaps_shape_;
+  vector<int> seg_num_shape_;
   vector<int> cont_shape_;
-  vector<int> h_0_shape_;
-  vector<int> c_0_shape_;
   
   int num_track_;
   float lambda_;
@@ -200,19 +202,27 @@ TYPED_TEST(TrackerLayerTest, TestSetUp) {
 	
 	tracker_layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
   	
-  	//v has: T x N x num_seg x num_track
+  	//v has: T x N x num_track x num_seg
   	EXPECT_EQ(this->v_->shape(0), T);
   	EXPECT_EQ(this->v_->shape(1), N);
-  	EXPECT_EQ(this->v_->shape(2), num_seg);
-  	EXPECT_EQ(this->v_->shape(3), num_track);
+  	EXPECT_EQ(this->v_->shape(2), num_track);
+  	EXPECT_EQ(this->v_->shape(3), num_seg);
+
+
+	//v has: T x N x num_track x num_seg
+  	EXPECT_EQ(this->vtilde_->shape(0), T);
+  	EXPECT_EQ(this->vtilde_->shape(1), N);
+  	EXPECT_EQ(this->vtilde_->shape(2), num_track);
+  	EXPECT_EQ(this->vtilde_->shape(3), num_seg);	
+	
 }
 
 TYPED_TEST(TrackerLayerTest, TestForwardT1) {
  	typedef typename TypeParam::Dtype Dtype;
 	vector<int> x_shape;
 	
-	int T = 3;
-	int N = 2;
+	int T = 4;
+	int N = 1;
 	int num_seg = 4;
 	int num_dim = 3;
 	int num_track = 5;
@@ -231,13 +241,22 @@ TYPED_TEST(TrackerLayerTest, TestForwardT1) {
   	tracker_layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
   
   	std::stringstream buffer;	
-  	buffer << "x: " << endl;
+        buffer << "x: " << endl;
   	this->printMat(buffer, this->x_->cpu_data(), num_dim, this->x_->count());
-  	buffer << "cont: " << endl;
+        buffer << "overlaps: " << endl;
+        this->printMat(buffer, this->overlaps_->cpu_data(), num_seg, this->overlaps_->count());
+        buffer << "seg_num: " << endl;
+        this->printMat(buffer, this->seg_num_->cpu_data(), 1, this->seg_num_->count());
+        
+        buffer << "cont: " << endl;
   	this->printMat(buffer, this->cont_->cpu_data(), N, this->cont_->count());
-  	buffer << "v: " << endl;
-  	this->printMat(buffer, this->v_->cpu_data(), num_track, this->v_->count());
-	LOG(ERROR) << buffer.str();
+  	
+        buffer << "v: " << endl;
+  	this->printMat(buffer, this->v_->cpu_data(), num_seg, this->v_->count());
+
+        buffer << "vtilde: " << this->vtilde_->count() << endl;
+        this->printMat(buffer, this->vtilde_->cpu_data(), num_seg, this->vtilde_->count());
+        LOG(ERROR) << buffer.str();
 }
 
 }  // namespace caffe

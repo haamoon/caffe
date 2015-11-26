@@ -98,7 +98,7 @@ void SuperpixelPoolingLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bott
     
   SuperpixelPoolingForward<Dtype><<<CAFFE_GET_BLOCKS(top_count), CAFFE_CUDA_NUM_THREADS>>>(
   	top_count, image_data, spixel_data, spixel_ptr, spixel_num, 
-  	bottom[0]->offset(0,1), image_width_, image_height_, mask_size, N_,
+  	bottom[0]->count(start_axes_ + 1), image_width_, image_height_, mask_size, N_,
   	spixel_ptr_len_, spixel_data_len_, channels_, top_data);
 }
 
@@ -126,10 +126,10 @@ void SuperpixelPoolingLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top
   
   	int top_count = top[0]->count();
   	
-    SuperpixelPoolingBackward<Dtype><<<CAFFE_GET_BLOCKS(top_count), CAFFE_CUDA_NUM_THREADS>>>(
-  	top_count, top_diff, spixel_data, spixel_ptr, spixel_num, bottom[0]->offset(0,1), 
-    image_width_, image_height_, mask_size, N_, spixel_ptr_len_, spixel_data_len_,
-    channels_, bottom_diff);
+        SuperpixelPoolingBackward<Dtype><<<CAFFE_GET_BLOCKS(top_count), CAFFE_CUDA_NUM_THREADS>>>(
+  	top_count, top_diff, spixel_data, spixel_ptr, spixel_num, bottom[0]->count(start_axes_ + 1), 
+        image_width_, image_height_, mask_size, N_, spixel_ptr_len_, spixel_data_len_,
+          channels_, bottom_diff);
 }
 
 INSTANTIATE_LAYER_GPU_FUNCS(SuperpixelPoolingLayer);

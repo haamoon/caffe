@@ -220,7 +220,7 @@ class SuperpixelPoolingLayer : public Layer<Dtype> {
   	int channels_;
   	int image_height_;
 	int image_width_;
-	
+	int start_axes_;
   	int spixel_data_len_;
   	int spixel_ptr_len_;
 };

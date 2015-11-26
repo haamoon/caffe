@@ -89,6 +89,21 @@ void ReshapeLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   top[0]->ShareDiff(*bottom[0]);
 }
 
+// template <typename Dtype>
+// void ReshapeLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+//                                     const vector<Blob<Dtype>*>& top) {
+//   if(this->layer_param_.name().substr(0, 9).compare("reshape2_") == 0) {
+//     std::stringstream buffer;
+//     const Dtype* data = top[0]->cpu_data();
+//     for(int i = 0; i < top[0]->count(); i++) {
+//       if(i % 4 == 0) buffer << std::endl;
+//       buffer << " " << data[i];
+//     }
+//     LOG(ERROR) << this->layer_param_.name() << top[0]->count() << " : " << buffer.str();  
+//     //LOG(ERROR) << "TOP: " << top[0]->num_axes() << ", " << top[0]->shape(0) << ", " << top[0]->shape(1) << ", " << top[0]->shape(2);
+//     //LOG(ERROR) << "BOT: " << bottom[0]->num_axes() << ", " << bottom[0]->shape(0) << ", " << bottom[0]->shape(1) << ", " << bottom[0]->shape(2)  << ", " << bottom[0]->shape(3);
+//   }
+// }
 INSTANTIATE_CLASS(ReshapeLayer);
 REGISTER_LAYER_CLASS(Reshape);
 

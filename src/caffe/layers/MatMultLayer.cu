@@ -49,7 +49,7 @@ void MatMultLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
 	//handle the case both A and B are full matrices: C = AB
 	if(!A_is_diag_ && !B_is_diag_) {
 		for (int n = 0; n < N_M_; ++n) {
-			caffe_gpu_gemm<Dtype>(A_transpose_, CblasNoTrans, D_1_,
+			caffe_gpu_gemm<Dtype>(A_transpose_, B_transpose_, D_1_,
     	    	D_3_, D_2_,
     	    	(Dtype)1., A_data + A_offset_ * n, B_data + B_offset_ * n,
     	    	(Dtype)0., C_data + C_offset_ * n);		

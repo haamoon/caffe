@@ -36,38 +36,40 @@ void caffe_gpu_inverse<float>(int n, float* X, float* Y, int batchSize)
       A[i] = A[i-1]+(n*n);
     CUDA_CHECK(cudaMemcpy(A_d,A,batchSize*sizeof(float *),cudaMemcpyHostToDevice));
 
-	/*  Turn X into its LU form, store pivot matrix  */ 
+    /*  Turn X into its LU form, store pivot matrix  */ 
     CUBLAS_CHECK(cublasSgetrfBatched(Caffe::cublas_handle(),n,A_d,lda,P,INFO,batchSize));
 
-	/*  Don't bother continuing when illegal argument (info<0) or singularity (info>0) occurs  */
+    /*  Don't bother continuing when illegal argument (info<0) or singularity (info>0) occurs  */
     int INFOh[batchSize];
     CUDA_CHECK(cudaMemcpy(INFOh,INFO,batchSize*sizeof(int),cudaMemcpyDeviceToHost));
 
-    for (int i = 0; i < batchSize; i++)
+    for (int i = 0; i < batchSize; i++) {
       if(INFOh[i]  != 0)
       {
         cudaDeviceReset();
         LOG(FATAL) << "Matrix " << i << " inversion failed: " << INFOh[i];
       }
+    }
 
-	float **C = (float **)malloc(batchSize*sizeof(float *));
+    float **C = (float **)malloc(batchSize*sizeof(float *));
     float **C_d;
     CUDA_CHECK(cudaMalloc(&C_d,batchSize*sizeof(float *)));
     C[0] = Y;
-    for (int i = 1; i < batchSize; i++)
+    for (int i = 1; i < batchSize; i++) {
       C[i] = C[i-1] + (n*n);
+    }
     CUDA_CHECK(cudaMemcpy(C_d,C,batchSize*sizeof(float *),cudaMemcpyHostToDevice));
     CUBLAS_CHECK(cublasSgetriBatched(Caffe::cublas_handle(),n,(const float **)A_d,lda,P,C_d,lda,INFO,batchSize));
 
     CUDA_CHECK(cudaMemcpy(INFOh,INFO,batchSize*sizeof(int),cudaMemcpyDeviceToHost));
 
-    for (int i = 0; i < batchSize; i++)
+    for (int i = 0; i < batchSize; i++) {
       if(INFOh[i] != 0)
       {
         cudaDeviceReset();
         LOG(FATAL) << "Matrix " << i << " inversion failed: " << INFOh[i];
       }
-    
+    }
     cudaFree(A_d); free(A);
     cudaFree(C_d); free(C);
     cudaFree(P); cudaFree(INFO);
@@ -83,7 +85,7 @@ void caffe_gpu_inverse<double>(int n, double* X, double* Y, int batchSize)
 
     int lda = n;
 
-	//create pointer to matrices
+    //create pointer to matrices
     double **A = (double **)malloc(batchSize*sizeof(double *));
     double **A_d;
     
@@ -91,44 +93,46 @@ void caffe_gpu_inverse<double>(int n, double* X, double* Y, int batchSize)
     
     
     A[0] = X;
-    for (int i = 1; i < batchSize; i++)
+    for (int i = 1; i < batchSize; i++) {
       A[i] = A[i-1]+(n*n);
+    }
     CUDA_CHECK(cudaMemcpy(A_d,A,batchSize*sizeof(double *),cudaMemcpyHostToDevice));
 
 	/*  Turn X into its LU form, store pivot matrix  */ 
     CUBLAS_CHECK(cublasDgetrfBatched(Caffe::cublas_handle(),n,
-    									A_d,lda,P,INFO,batchSize));
+                                     A_d,lda,P,INFO,batchSize));
 
 	/*  Don't bother continuing when illegal argument (info<0) or singularity (info>0) occurs  */
     int INFOh[batchSize];
     CUDA_CHECK(cudaMemcpy(INFOh,INFO,batchSize*sizeof(int),cudaMemcpyDeviceToHost));
 
-    for (int i = 0; i < batchSize; i++)
+    for (int i = 0; i < batchSize; i++) {
       if(INFOh[i]  != 0)
       {
         cudaDeviceReset();
         LOG(FATAL) << "Matrix " << i << " inversion failed: " << INFOh[i];
       }
-
-	double **C = (double **)malloc(batchSize*sizeof(double *));
+    }
+    double **C = (double **)malloc(batchSize*sizeof(double *));
     double **C_d;
     CUDA_CHECK(cudaMalloc(&C_d,batchSize*sizeof(double *)));
     C[0] = Y;
-    for (int i = 1; i < batchSize; i++)
+    for (int i = 1; i < batchSize; i++) {
       C[i] = C[i-1] + (n*n);
+    }
     CUDA_CHECK(cudaMemcpy(C_d,C,batchSize*sizeof(double *),cudaMemcpyHostToDevice));
     CUBLAS_CHECK(cublasDgetriBatched(Caffe::cublas_handle(), n, 
-    					(const double **)A_d, lda,P, C_d, lda, INFO, batchSize));
+                                     (const double **)A_d, lda,P, C_d, lda, INFO, batchSize));
 
     CUDA_CHECK(cudaMemcpy(INFOh,INFO,batchSize*sizeof(int),cudaMemcpyDeviceToHost));
 
-    for (int i = 0; i < batchSize; i++)
+    for (int i = 0; i < batchSize; i++) {
       if(INFOh[i] != 0)
       {
         cudaDeviceReset();
         LOG(FATAL) << "Matrix " << i << " inversion failed: " << INFOh[i];
       }
-    
+    }
     cudaFree(A_d); free(A);
     cudaFree(C_d); free(C);
     cudaFree(P); cudaFree(INFO);

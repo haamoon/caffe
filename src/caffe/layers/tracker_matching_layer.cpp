@@ -24,14 +24,13 @@ void TrackerMatchingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   CHECK_GE(bottom[1]->num_axes(), 2) << "Input(1) segment overlaps should have at least 2 axis, "
       << "corresponding to (..., segment_id, segment_id)";
       
-  CHECK_GE(1, bottom[2]->num_axes()) << "Input(2) segment number should have at least 1 axis";
+  CHECK_GE(bottom[2]->num_axes(), 1) << "Input(2) segment number should have at least 1 axis";
   
   int input_start_axis = bottom[0]->num_axes() - 2;
   N_ = bottom[0]->count(0, input_start_axis);
 
   max_ntrack_ = bottom[0]->shape(input_start_axis);
   max_nseg_ = bottom[0]->shape(input_start_axis + 1);
-      
   CHECK_EQ(N_, bottom[1]->count(0, input_start_axis));
   CHECK_EQ(N_, bottom[2]->count());
   
@@ -56,20 +55,22 @@ void TrackerMatchingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom
   const Dtype* seg_num = bottom[2]->cpu_data();
   
   Dtype* top_data = top[0]->mutable_cpu_data();
- 
+  int max_index = 0;
+//   LOG(ERROR) << "MATCHING:" << max_ntrack_ << ", " << max_nseg_ << ", " << N_ << ", " << top[0]->count() << ", " << bottom[0]->count();
   for(int n = 0; n < N_; ++n) {
     for(int track = 0; track < max_ntrack_; ++track) {
-      int max_index = 0;
+      max_index = 0;
       for(int seg = 1; seg < seg_num[n]; ++seg) {
         if(v_data[max_index] < v_data[seg]) {
           max_index = seg;
-  		    }
-  		  }
-  		  caffe_copy(max_nseg_, overlaps_data + max_index * max_nseg_, top_data);
-  		  v_data += max_nseg_;
-  		  top_data += max_nseg_;
-  	  }
-  	}
+        }
+      }
+      caffe_copy(max_nseg_, overlaps_data + max_index * max_nseg_, top_data);
+      v_data += max_nseg_;
+      top_data += max_nseg_;
+    }
+    overlaps_data += max_nseg_ * max_nseg_;
+  }
 }
 
 #ifdef CPU_ONLY
