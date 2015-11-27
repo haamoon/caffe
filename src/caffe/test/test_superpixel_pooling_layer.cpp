@@ -29,8 +29,8 @@ namespace caffe {
       int T = 2
       int N = 2;
       int C = 3;
-      int w = 5;
       int h = 6;
+      int w = 5;
       int spixel_data_len = 10;
       int spixel_ptr_len = 10;
       
@@ -130,7 +130,7 @@ namespace caffe {
         spixel_ptr_array += spixel_ptr_len;
       }
       
-      //shape: T_ x N_
+      //spixel_num_ shape: T_ x N_
       vector<int> spixel_num_shape;
       spixel_num_shape.push_back(T);
       spixel_num_shape.push_back(N);
@@ -141,12 +141,31 @@ namespace caffe {
       spixel_num_array[2] = 2;
       spixel_num_array[3] = 3;
       
+      //mask_size_ shape: T_ x N_ x 2
+      vector<int> mask_size_shape;
+      mask_size_shape.push_back(T);
+      mask_size_shape.push_back(N);
+      mask_size_shape.push_back(2);
+      mask_size_->Reshape(mask_size_shape);
+      Dtype* mask_size_array = mask_size_->mutable_cpu_data();
+      mask_size_array[0] = h;
+      mask_size_array[1] = w;
+      
+      mask_size_array[2] = h * 2;
+      mask_size_array[3] = w;
+      
+      mask_size_array[4] = h;
+      mask_size_array[5] = w * 2;
+      
+      mask_size_array[6] = h * 2;
+      mask_size_array[7] = w * 2;
+      
       //Add blobs to input vector
       blob_bottom_vec_.push_back(image_);
       blob_bottom_vec_.push_back(spixel_data_);
       blob_bottom_vec_.push_back(spixel_ptr_);
       blob_bottom_vec_.push_back(spixel_num_);
-      
+      blob_bottom_vec_.push_back(mask_size_)
       //Add top blob to the output vector
       blob_top_vec_.push_back(output_);
     }
@@ -174,6 +193,7 @@ namespace caffe {
     Blob<Dtype>* spixel_data_;
     Blob<Dtype>* spixel_ptr_;
     Blob<Dtype>* spixel_num_;
+    Blob<Dtype>* mask_size_;
     Blob<Dtype>* output_;
     
     vector<Blob<Dtype>*> blob_bottom_vec_;
