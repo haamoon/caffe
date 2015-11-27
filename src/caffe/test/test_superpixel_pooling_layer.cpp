@@ -26,7 +26,7 @@ namespace caffe {
       spixel_num_ = new Blob<Dtype>();
       output_ = new Blob<Dtype>();
       
-      int T = 2
+      int T = 2;
       int N = 2;
       int C = 3;
       int h = 6;
@@ -122,10 +122,10 @@ namespace caffe {
         spixel_ptr_array += spixel_ptr_len;
       
         //inds for image 2
-        seg_inds_data[0] = 0;
-        seg_inds_data[1] = 2;
-        seg_inds_data[2] = 4;
-        seg_inds_data[3] = 6;
+        spixel_ptr_array[0] = 0;
+        spixel_ptr_array[1] = 2;
+        spixel_ptr_array[2] = 4;
+        spixel_ptr_array[3] = 6;
       
         spixel_ptr_array += spixel_ptr_len;
       }
