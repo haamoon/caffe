@@ -1,0 +1,239 @@
+#include <algorithm>
+#include <vector>
+
+#include "gtest/gtest.h"
+
+#include "caffe/blob.hpp"
+#include "caffe/common.hpp"
+#include "caffe/filler.hpp"
+#include "caffe/vision_layers.hpp"
+#include "caffe/tracking_layers.hpp"
+#include "caffe/test/test_caffe_main.hpp"
+#include "caffe/test/test_gradient_check_util.hpp"
+
+namespace caffe {
+  
+  template <typename TypeParam>
+  class SuperpixelPoolingLayerTest : public MultiDeviceTest<TypeParam> {
+    typedef typename TypeParam::Dtype Dtype;
+    
+  protected:
+    SuperpixelPoolingLayerTest() {
+      image_ = new Blob<Dtype>();
+      spixel_data_ = new Blob<Dtype>();
+      mask_size_= new Blob<Dtype>();
+      spixel_ptr_ = new Blob<Dtype>();
+      spixel_num_ = new Blob<Dtype>();
+      output_ = new Blob<Dtype>();
+      
+      int T = 2
+      int N = 2;
+      int C = 3;
+      int w = 5;
+      int h = 6;
+      int spixel_data_len = 10;
+      int spixel_ptr_len = 10;
+      
+      // fill the values
+      Caffe::set_random_seed(1701);
+      
+      FillerParameter filler_param;
+      UniformFiller<Dtype> filler(filler_param);
+      
+      // image_ shape: T_ x N_ x c_ x h_ x w_
+      vector<int> image_shape;
+      image_shape.push_back(T);
+      image_shape.push_back(N);
+      image_shape.push_back(C);
+      image_shape.push_back(h);
+      image_shape.push_back(w);
+      image_->Reshape(image_shape);
+      filler.Fill(image_);
+      
+      //spixle_data_ shape: T_ x N_ x spixel_data_len x 2
+      vector<int> spixel_data_shape;
+      spixel_data_shape.push_back(T);
+      spixel_data_shape.push_back(N);
+      spixel_data_shape.push_back(spixel_data_len);
+      spixel_data_shape.push_back(2);
+      spixel_data_->Reshape(spixel_data_shape);
+      
+      Dtype* spixel_data_array = spixel_data_->mutable_cpu_data();
+      int i = 0;
+      for(int num = 0; num < 2; num++) {
+        //data for image 1, superpixel 1
+        spixel_data_array[i++] = 0;
+        spixel_data_array[i++] = 0;
+        //
+        spixel_data_array[i++] = 0;
+        spixel_data_array[i++] = 1;
+      
+        //data for image 1, superpixel 2
+        spixel_data_array[i++] = 2;
+        spixel_data_array[i++] = 0;
+        //
+        spixel_data_array[i++] = 0;
+        spixel_data_array[i++] = 3;
+      
+        spixel_data_array += spixel_data_len * 2;
+        i = 0;
+      
+        //mask for image 2, super pixel 1
+        spixel_data_array[i++] = 4;
+        spixel_data_array[i++] = 1;
+        //
+        spixel_data_array[i++] = 4;
+        spixel_data_array[i++] = 2;
+        //
+        //mask for image 2, super pixel 2
+        spixel_data_array[i++] = 1;
+        spixel_data_array[i++] = 3;
+        //
+        spixel_data_array[i++] = 1;
+        spixel_data_array[i++] = 4;
+        //
+        //mask for image 2, super pixel 3
+        spixel_data_array[i++] = 0;
+        spixel_data_array[i++] = 3;
+        //
+        spixel_data_array[i++] = 0;
+        spixel_data_array[i++] = 4;
+        //
+        spixel_data_array += spixel_data_len * 2;
+        i = 0;
+      }
+      
+      
+      //spixel_ptr_ shape: T_ x N_ x spixel_ptr_len
+      vector<int> spixel_ptr_shape;
+      spixel_ptr_shape.push_back(T);
+      spixel_ptr_shape.push_back(N);
+      spixel_ptr_shape.push_back(spixel_ptr_len);
+      spixel_ptr_->Reshape(spixel_ptr_shape);
+      
+      Dtype* spixel_ptr_array = spixel_ptr_->mutable_cpu_data();
+      
+      for(int num = 0; num < 2; num++) {
+        //inds for image 1
+        spixel_ptr_array[0] = 0;
+        spixel_ptr_array[1] = 2;
+        spixel_ptr_array[2] = 4;
+      
+        spixel_ptr_array += spixel_ptr_len;
+      
+        //inds for image 2
+        seg_inds_data[0] = 0;
+        seg_inds_data[1] = 2;
+        seg_inds_data[2] = 4;
+        seg_inds_data[3] = 6;
+      
+        spixel_ptr_array += spixel_ptr_len;
+      }
+      
+      //shape: T_ x N_
+      vector<int> spixel_num_shape;
+      spixel_num_shape.push_back(T);
+      spixel_num_shape.push_back(N);
+      spixel_num_->Reshape(spixel_num_shape);
+      Dtype* spixel_num_array = spixel_num_->mutable_cpu_data();
+      spixel_num_array[0] = 2;
+      spixel_num_array[1] = 3;
+      spixel_num_array[2] = 2;
+      spixel_num_array[3] = 3;
+      
+      //Add blobs to input vector
+      blob_bottom_vec_.push_back(image_);
+      blob_bottom_vec_.push_back(spixel_data_);
+      blob_bottom_vec_.push_back(spixel_ptr_);
+      blob_bottom_vec_.push_back(spixel_num_);
+      
+      //Add top blob to the output vector
+      blob_top_vec_.push_back(output_);
+    }
+    
+    virtual ~SuperpixelPoolingLayerTest() {
+      delete image_;
+      delete spixel_data_;
+      delete spixel_ptr_;
+      delete spixel_num_;
+      delete output_;
+    }
+    
+    template <typename Dtype>
+    void printMat(std::stringstream& buffer, Dtype* mat, int col, int count) {
+      for (int i = 0; i < count; ++i) {
+        if(i % col == 0) {
+          buffer << ';' << endl;
+        }
+        buffer << mat[i] << ' ';
+      }
+      buffer << endl;
+    }
+    
+    Blob<Dtype>* image_;
+    Blob<Dtype>* spixel_data_;
+    Blob<Dtype>* spixel_ptr_;
+    Blob<Dtype>* spixel_num_;
+    Blob<Dtype>* output_;
+    
+    vector<Blob<Dtype>*> blob_bottom_vec_;
+    vector<Blob<Dtype>*> blob_top_vec_;
+  };
+  
+  TYPED_TEST_CASE(SuperpixelPoolingLayerTest, TestDtypesAndDevices);
+  
+  TYPED_TEST(SuperpixelPoolingLayerTest, TestSetUp) {
+    typedef typename TypeParam::Dtype Dtype;
+    LayerParameter layer_param;
+    
+    SuperpixelPoolingLayer<Dtype>layer(layer_param);
+    
+    layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+    
+    //T_ x N_ x (spixel_ptr_len - 1) x channels
+    EXPECT_EQ(this->output_->shape(0), 2);
+    EXPECT_EQ(this->output_->shape(1), 2);
+    EXPECT_EQ(this->output_->shape(2), 9);
+    EXPECT_EQ(this->output_->shape(3), 3);
+  }
+  
+//  TYPED_TEST(SuperpixelPoolingLayerTest, TestSuperpixelPooling) {
+//    typedef typename TypeParam::Dtype Dtype;
+//    LayerParameter layer_param;
+//    
+//    SuperpixelPoolingLayer<Dtype>layer(layer_param);
+//    
+//    layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+//    
+//    layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+//    layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+//    
+//    const Dtype* X_data = this->blob_X_->cpu_data();
+//    const Dtype* image_data = this->blob_image_->cpu_data();
+//    
+//    std::stringstream buffer;
+//    
+//    buffer << "Input Image:" << std::endl;
+//    for(int i = 0; i < this->blob_image_->count(0,2); ++i) {
+//      this->printMat(buffer, image_data, 6, this->blob_image_->offset(0, 1));
+//      image_data += this->blob_image_->offset(0, 1);
+//      buffer << std::endl;
+//    }
+//    buffer << "Feature Output:" << std::endl;
+//    this->printMat(buffer, X_data, 3, this->blob_X_->count());
+//    
+//    LOG(INFO) << buffer.str();
+//  }
+//  
+//  
+//  TYPED_TEST(SuperpixelPoolingLayerTest, TestSuperpixelPoolingGradient) {
+//    typedef typename TypeParam::Dtype Dtype;
+//    LayerParameter layer_param;
+//    SuperpixelPoolingLayer<Dtype> layer(layer_param);
+//    
+//    GradientChecker<Dtype> checker(1e-2, 1e-2);
+//    checker.CheckGradient(&layer, this->blob_bottom_vec_,
+//                          this->blob_top_vec_, 0);
+//  }
+  
+}  // namespace caffe

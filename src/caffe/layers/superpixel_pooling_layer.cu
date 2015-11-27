@@ -38,7 +38,7 @@ __global__ void SuperpixelPoolingForward(const int nthreads,
   		Dtype w_ratio = image_width / mask_size[1]; 
   	
     	for(int i = start_ind; i < end_ind; i++) {
-    		 spixel_data += n * spixel_data_len + i * 2;
+    		 spixel_data += (n * spixel_data_len + i) * 2;
     		 int row = (int)(spixel_data[0] * h_ratio);
     		 int col = (int)(spixel_data[1] * w_ratio);
     		 sum += image_data[ n * n_pixel + row * image_width + col ] 
@@ -73,7 +73,7 @@ __global__ void SuperpixelPoolingBackward(const int nthreads,
   		Dtype w_ratio = image_width / mask_size[1];
   	
     	for(int i = start_ind; i < end_ind; i++) {
-    	 spixel_data += n * spixel_data_len + i * 2;
+    	 spixel_data += (n * spixel_data_len + i) * 2;
     		 int row = (int)(spixel_data[0] * h_ratio);
     		 int col = (int)(spixel_data[1] * w_ratio);
     		 bottom_diff[ n * n_pixel + row * image_width + col ] = 

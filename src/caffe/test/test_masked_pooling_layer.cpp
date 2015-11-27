@@ -19,7 +19,6 @@ class MaskedPoolingLayerTest : public MultiDeviceTest<TypeParam> {
 
  protected:
   MaskedPoolingLayerTest() {
-    
     blob_image_ = new Blob<Dtype>();
   	blob_seg_inds_ = new Blob<Dtype>();
   	blob_mask_ = new Blob<Dtype>();
@@ -29,8 +28,8 @@ class MaskedPoolingLayerTest : public MultiDeviceTest<TypeParam> {
   
     int N = 2;
     int C = 3;
-	int max_nseg = 4;
-	int mask_lenght = 10;
+    int max_nseg = 4;
+    int mask_lenght = 10;
 	
     // fill the values
     Caffe::set_random_seed(1701);
