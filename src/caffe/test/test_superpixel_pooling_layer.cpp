@@ -240,19 +240,19 @@ namespace caffe {
     const Dtype* mask_size_array = this->mask_size_->cpu_data();
     
     
-    for(int n = 0; n < N * T; n++) {
+    for(int n = 0; n < this->N * this->T; n++) {
       for(int sp = 0; sp < spixel_num_array[n]; sp++) {
-        int start = spixel_ptr_array[n * spixel_ptr_len + sp];
-        int row1 = spixel_data_array[n * spixel_data_len * 2 + start];
-        int col1 = spixel_data_array[n * spixel_data_len * 2 + start + 1];
+        int start = spixel_ptr_array[n * this->spixel_ptr_len + sp];
+        int row1 = spixel_data_array[n * this->spixel_data_len * 2 + start];
+        int col1 = spixel_data_array[n * this->spixel_data_len * 2 + start + 1];
         int c_row1 = (int) (row1 * this->image_->shape(4) / mask_size_array[n * 2]);
         int c_col1 = (int) (col1 * this->image_->shape(4) / mask_size_array[n * 2 + 1]);
         LOG(ERROR) << "row1 = " << row1 << ", " << c_row1 << " col1 = " << col1 << ", " << c_col1;
         
         start++;
         
-        int row2 = spixel_data_array[n * spixel_data_len * 2 + start];
-        int col2 = spixel_data_array[n * spixel_data_len * 2 + start + 1];
+        int row2 = spixel_data_array[n * this->spixel_data_len * 2 + start];
+        int col2 = spixel_data_array[n * this->spixel_data_len * 2 + start + 1];
         int c_row2 = (int) (row2 * this->image_->shape(4) / mask_size_array[n * 2]);
         int c_col2 = (int) (col2 * this->image_->shape(4) / mask_size_array[n * 2 + 1]);
         LOG(ERROR) << "row2 = " << row2 << ", " << c_row2 << " col2 = " << col2 << ", " << c_col2;
@@ -264,7 +264,7 @@ namespace caffe {
                       image_array[n * this->image_->count(2) +
                                   c * this->image_->count(3) +
                                   c_row2 * w + c_col2];
-          CHECKEQ(sum, output_array[n * this->count(2) + sp * 3 + c]);
+          EXPECT_EQ(sum, output_array[n * this->output_->count(2) + sp * 3 + c]);
         }
       }
     }
