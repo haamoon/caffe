@@ -95,7 +95,7 @@ namespace caffe {
             int spixel_ptr_len = spixel_ptr_len_;
             int channels = channels_;
             int spixel_data_len = spixel_data_len;
-            int image_height = image_height_
+            int image_height = image_height_;
             int image_width = image_width_;
             
             Dtype sum = 0;
