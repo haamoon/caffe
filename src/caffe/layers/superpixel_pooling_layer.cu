@@ -14,7 +14,7 @@ namespace caffe {
   template <typename Dtype>
   __global__ void SuperpixelPoolingForward(const int nthreads,
                                            const Dtype* image_data, const Dtype* spixel_data, const Dtype* spixel_ptr,
-                                           const Dtype* spixel_num, int n_pixel, int image_width, int image_height,
+                                           const Dtype* spixel_num, int image_width, int image_height,
                                            const Dtype* mask_size, int N, int spixel_ptr_len, int spixel_data_len,
                                            int channels, Dtype* top_data) {
     
@@ -41,7 +41,7 @@ namespace caffe {
           spixel_data += (n * spixel_data_len + i) * 2;
           int row = (int)(spixel_data[0] * h_ratio);
           int col = (int)(spixel_data[1] * w_ratio);
-          sum += image_data[ n * n_pixel + row * image_width + col ]
+          sum += image_data[((n * channels + c ) * image_height + row) * image_width + col]
           / (end_ind - start_ind);
         }
       }
@@ -52,7 +52,7 @@ namespace caffe {
   template <typename Dtype>
   __global__ void SuperpixelPoolingBackward(const int nthreads,
                                             const Dtype* top_diff, const Dtype* spixel_data, const Dtype* spixel_ptr,
-                                            const Dtype* spixel_num, int n_pixel, int image_width, int image_height,
+                                            const Dtype* spixel_num, int image_width, int image_height,
                                             const Dtype* mask_size, int N, int spixel_ptr_len, int spixel_data_len,
                                             int channels, Dtype* bottom_diff) {
     //nthreads = N_ * channels_ * spixel_num
@@ -76,7 +76,7 @@ namespace caffe {
           spixel_data += (n * spixel_data_len + i) * 2;
           int row = (int)(spixel_data[0] * h_ratio);
           int col = (int)(spixel_data[1] * w_ratio);
-          bottom_diff[ n * n_pixel + row * image_width + col ] =
+          bottom_diff[((n * channels + c ) * image_height + row) * image_width + col] =
           top_diff[(n * (spixel_ptr_len - 1) + spixel) * channels + c]
           / (end_ind - start_ind);
         }
@@ -97,14 +97,15 @@ namespace caffe {
     const int top_count = top[0]->count();
     
     SuperpixelPoolingForward<Dtype><<<CAFFE_GET_BLOCKS(top_count), CAFFE_CUDA_NUM_THREADS>>>(
-                                                                                             top_count, image_data, spixel_data, spixel_ptr, spixel_num,
-                                                                                             bottom[0]->count(start_axes_ + 1), image_width_, image_height_, mask_size, N_,
-                                                                                             spixel_ptr_len_, spixel_data_len_, channels_, top_data);
+                    top_count, image_data, spixel_data, spixel_ptr, spixel_num,
+                    image_width_, image_height_, mask_size, N_,spixel_ptr_len_,
+                    spixel_data_len_, channels_, top_data);
   }
   
   template <typename Dtype>
   void SuperpixelPoolingLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
-                                                   const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
+                                                   const vector<bool>& propagate_down,
+                                                   const vector<Blob<Dtype>*>& bottom) {
     
     CHECK(!propagate_down[1]) << "Can not backpropagate to spixel_data";
     CHECK(!propagate_down[2]) << "Can not backpropagate to spixel_ptr";
@@ -126,10 +127,11 @@ namespace caffe {
     
     int top_count = top[0]->count();
     
-    SuperpixelPoolingBackward<Dtype><<<CAFFE_GET_BLOCKS(top_count), CAFFE_CUDA_NUM_THREADS>>>(
-                                                                                              top_count, top_diff, spixel_data, spixel_ptr, spixel_num, bottom[0]->count(start_axes_ + 1),
-                                                                                              image_width_, image_height_, mask_size, N_, spixel_ptr_len_, spixel_data_len_,
-                                                                                              channels_, bottom_diff);
+    SuperpixelPoolingBackward<Dtype>
+      <<<CAFFE_GET_BLOCKS(top_count), CAFFE_CUDA_NUM_THREADS>>>(
+      top_count, top_diff, spixel_data, spixel_ptr, spixel_num, image_width_,
+      image_height_, mask_size, N_, spixel_ptr_len_, spixel_data_len_,
+      channels_, bottom_diff);
   }
   
   INSTANTIATE_LAYER_GPU_FUNCS(SuperpixelPoolingLayer);
