@@ -26,13 +26,13 @@ namespace caffe {
       spixel_num_ = new Blob<Dtype>();
       output_ = new Blob<Dtype>();
       
-      int T = 2;
-      int N = 2;
+      T = 2;
+      N = 2;
       int C = 3;
       int h = 6;
       int w = 5;
-      int spixel_data_len = 10;
-      int spixel_ptr_len = 10;
+      spixel_data_len = 10;
+      spixel_ptr_len = 10;
       
       // fill the values
       Caffe::set_random_seed(1701);
@@ -195,6 +195,10 @@ namespace caffe {
     Blob<Dtype>* spixel_num_;
     Blob<Dtype>* mask_size_;
     Blob<Dtype>* output_;
+    int N;
+    int T;
+    int spixel_data_len;
+    int spixel_ptr_len;
     
     vector<Blob<Dtype>*> blob_bottom_vec_;
     vector<Blob<Dtype>*> blob_top_vec_;
@@ -228,9 +232,43 @@ namespace caffe {
     layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
     layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
     
+    const Dtype* spixel_ptr_array = this->spixel_ptr_->cpu_data();
+    const Dtype* spixel_data_array = this->spixel_data_->cpu_data();
+    const Dtype* spixel_num_array = this->spixel_num_->cpu_data();
     const Dtype* output_array = this->output_->cpu_data();
     const Dtype* image_array = this->image_->cpu_data();
+    const Dtype* mask_size_array = this->mask_size_->cpu_data();
     
+    
+    for(int n = 0; n < N * T; n++) {
+      for(int sp = 0; sp < spixel_num_array[n]; sp++) {
+        int start = spixel_ptr_array[n * spixel_ptr_len + sp];
+        int row1 = spixel_data_array[n * spixel_data_len * 2 + start];
+        int col1 = spixel_data_array[n * spixel_data_len * 2 + start + 1];
+        int c_row1 = (int) (row1 * this->image_->shape(4) / mask_size_array[n * 2]);
+        int c_col1 = (int) (col1 * this->image_->shape(4) / mask_size_array[n * 2 + 1]);
+        LOG(ERROR) << "row1 = " << row1 << ", " << c_row1 << " col1 = " << col1 << ", " << c_col1;
+        
+        start++;
+        
+        int row2 = spixel_data_array[n * spixel_data_len * 2 + start];
+        int col2 = spixel_data_array[n * spixel_data_len * 2 + start + 1];
+        int c_row2 = (int) (row2 * this->image_->shape(4) / mask_size_array[n * 2]);
+        int c_col2 = (int) (col2 * this->image_->shape(4) / mask_size_array[n * 2 + 1]);
+        LOG(ERROR) << "row2 = " << row2 << ", " << c_row2 << " col2 = " << col2 << ", " << c_col2;
+        
+        for(int c = 0; c < 3; c++) {
+          Dtype sum = image_array[n * this->image_->count(2) +
+                                  c * this->image_->count(3) +
+                                  c_row1 * w + c_col1] +
+                      image_array[n * this->image_->count(2) +
+                                  c * this->image_->count(3) +
+                                  c_row2 * w + c_col2];
+          CHECKEQ(sum, output_array[n * this->count(2) + sp * 3 + c]);
+        }
+      }
+    }
+
     std::stringstream buffer;
     
     buffer << "Input Image:" << std::endl;
