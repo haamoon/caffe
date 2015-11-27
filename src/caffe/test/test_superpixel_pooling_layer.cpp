@@ -244,8 +244,8 @@ namespace caffe {
     for(int n = 0; n < this->N * this->T; n++) {
       for(int sp = 0; sp < spixel_num_array[n]; sp++) {
         int start = spixel_ptr_array[n * this->spixel_ptr_len + sp];
-        int row1 = spixel_data_array[n * this->spixel_data_len * 2 + start];
-        int col1 = spixel_data_array[n * this->spixel_data_len * 2 + start + 1];
+        int row1 = spixel_data_array[n * this->spixel_data_len * 2 + start * 2];
+        int col1 = spixel_data_array[n * this->spixel_data_len * 2 + start * 2 + 1];
         int c_row1 = (int) (row1 * this->image_->shape(4) / mask_size_array[n * 2]);
         int c_col1 = (int) (col1 * this->image_->shape(4) / mask_size_array[n * 2 + 1]);
         LOG(ERROR) << "row1 = " << row1 << ", " << c_row1 << " col1 = " << col1 << ", " << c_col1;
