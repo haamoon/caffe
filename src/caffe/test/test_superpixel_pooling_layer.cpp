@@ -197,43 +197,39 @@ namespace caffe {
     EXPECT_EQ(this->output_->shape(3), 3);
   }
   
-//  TYPED_TEST(SuperpixelPoolingLayerTest, TestSuperpixelPooling) {
-//    typedef typename TypeParam::Dtype Dtype;
-//    LayerParameter layer_param;
-//    
-//    SuperpixelPoolingLayer<Dtype>layer(layer_param);
-//    
-//    layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
-//    
-//    layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
-//    layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
-//    
-//    const Dtype* X_data = this->blob_X_->cpu_data();
-//    const Dtype* image_data = this->blob_image_->cpu_data();
-//    
-//    std::stringstream buffer;
-//    
-//    buffer << "Input Image:" << std::endl;
-//    for(int i = 0; i < this->blob_image_->count(0,2); ++i) {
-//      this->printMat(buffer, image_data, 6, this->blob_image_->offset(0, 1));
-//      image_data += this->blob_image_->offset(0, 1);
-//      buffer << std::endl;
-//    }
-//    buffer << "Feature Output:" << std::endl;
-//    this->printMat(buffer, X_data, 3, this->blob_X_->count());
-//    
-//    LOG(INFO) << buffer.str();
-//  }
-//  
-//  
-//  TYPED_TEST(SuperpixelPoolingLayerTest, TestSuperpixelPoolingGradient) {
-//    typedef typename TypeParam::Dtype Dtype;
-//    LayerParameter layer_param;
-//    SuperpixelPoolingLayer<Dtype> layer(layer_param);
-//    
-//    GradientChecker<Dtype> checker(1e-2, 1e-2);
-//    checker.CheckGradient(&layer, this->blob_bottom_vec_,
-//                          this->blob_top_vec_, 0);
-//  }
+  TYPED_TEST(SuperpixelPoolingLayerTest, TestSuperpixelPooling) {
+    typedef typename TypeParam::Dtype Dtype;
+    LayerParameter layer_param;
+    
+    SuperpixelPoolingLayer<Dtype>layer(layer_param);
+    
+    layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+    
+    layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+    layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+    
+    const Dtype* output_array = this->output_->cpu_data();
+    const Dtype* image_array = this->image_->cpu_data();
+    
+    std::stringstream buffer;
+    
+    buffer << "Input Image:" << std::endl;
+    this->printMat(buffer, image_array, 5, this->image_->count());
+    buffer << "Feature Output:" << std::endl;
+    this->printMat(buffer, output_array, 3, this->output_->count());
+    
+    LOG(ERROR) << buffer.str();
+  }
+  
+  
+  TYPED_TEST(SuperpixelPoolingLayerTest, TestSuperpixelPoolingGradient) {
+    typedef typename TypeParam::Dtype Dtype;
+    LayerParameter layer_param;
+    SuperpixelPoolingLayer<Dtype> layer(layer_param);
+    
+    GradientChecker<Dtype> checker(1e-2, 1e-2);
+    checker.CheckGradient(&layer, this->blob_bottom_vec_,
+                          this->blob_top_vec_, 0);
+  }
   
 }  // namespace caffe
