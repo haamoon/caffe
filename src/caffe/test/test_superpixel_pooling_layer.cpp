@@ -165,7 +165,7 @@ namespace caffe {
       blob_bottom_vec_.push_back(spixel_data_);
       blob_bottom_vec_.push_back(spixel_ptr_);
       blob_bottom_vec_.push_back(spixel_num_);
-      blob_bottom_vec_.push_back(mask_size_)
+      blob_bottom_vec_.push_back(mask_size_);
       //Add top blob to the output vector
       blob_top_vec_.push_back(output_);
     }
