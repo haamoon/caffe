@@ -39,8 +39,8 @@ namespace caffe {
     CHECK_EQ(N_, bottom[4]->count(0, start_axes_));
     
     channels_ = bottom[0]->shape(start_axes_);
-    image_width_ = bottom[0]->shape(start_axes_ + 1);
-    image_height_ = bottom[0]->shape(start_axes_ + 2);
+    image_height_ = bottom[0]->shape(start_axes_ + 1);
+    image_width_ = bottom[0]->shape(start_axes_ + 2);
     
     //bottom[1] has size ... x spixel_data_len_ x 2
     spixel_data_len_ = bottom[1]->shape(start_axes_);
