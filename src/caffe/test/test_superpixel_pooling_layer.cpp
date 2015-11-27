@@ -253,8 +253,8 @@ namespace caffe {
         
         start += 2;
         
-        int row2 = spixel_data_array[n * this->spixel_data_len * 2 + start];
-        int col2 = spixel_data_array[n * this->spixel_data_len * 2 + start + 1];
+        int row2 = spixel_data_array[n * this->spixel_data_len * 2 + start * 2];
+        int col2 = spixel_data_array[n * this->spixel_data_len * 2 + start * 2+ 1];
         int c_row2 = (int) (row2 * this->image_->shape(4) / mask_size_array[n * 2]);
         int c_col2 = (int) (col2 * this->image_->shape(4) / mask_size_array[n * 2 + 1]);
         LOG(ERROR) << "row2 = " << row2 << ", " << c_row2 << " col2 = " << col2 << ", " << c_col2;
