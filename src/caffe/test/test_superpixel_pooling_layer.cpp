@@ -69,8 +69,8 @@ namespace caffe {
         spixel_data_array[i++] = 1;
       
         //data for image 1, superpixel 2
-        spixel_data_array[i++] = 2;
         spixel_data_array[i++] = 0;
+        spixel_data_array[i++] = 2;
         //
         spixel_data_array[i++] = 0;
         spixel_data_array[i++] = 3;
@@ -250,9 +250,7 @@ namespace caffe {
         int c_row1 = (int) (row1 * this->image_->shape(4) / mask_size_array[n * 2]);
         int c_col1 = (int) (col1 * this->image_->shape(4) / mask_size_array[n * 2 + 1]);
         LOG(ERROR) << "row1 = " << row1 << ", " << c_row1 << " col1 = " << col1 << ", " << c_col1;
-        
         start += 1;
-        
         int row2 = spixel_data_array[n * this->spixel_data_len * 2 + start * 2];
         int col2 = spixel_data_array[n * this->spixel_data_len * 2 + start * 2+ 1];
         int c_row2 = (int) (row2 * this->image_->shape(4) / mask_size_array[n * 2]);
