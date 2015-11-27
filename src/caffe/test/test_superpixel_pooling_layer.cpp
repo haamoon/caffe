@@ -30,7 +30,7 @@ namespace caffe {
       N = 2;
       int C = 3;
       int h = 6;
-      int w = 5;
+      w = 5;
       spixel_data_len = 10;
       spixel_ptr_len = 10;
       
@@ -199,6 +199,7 @@ namespace caffe {
     int T;
     int spixel_data_len;
     int spixel_ptr_len;
+    int w;
     
     vector<Blob<Dtype>*> blob_bottom_vec_;
     vector<Blob<Dtype>*> blob_top_vec_;
@@ -260,10 +261,10 @@ namespace caffe {
         for(int c = 0; c < 3; c++) {
           Dtype sum = image_array[n * this->image_->count(2) +
                                   c * this->image_->count(3) +
-                                  c_row1 * w + c_col1] +
+                                  c_row1 * this->w + c_col1] +
                       image_array[n * this->image_->count(2) +
                                   c * this->image_->count(3) +
-                                  c_row2 * w + c_col2];
+                                  c_row2 * this->w + c_col2];
           EXPECT_EQ(sum, output_array[n * this->output_->count(2) + sp * 3 + c]);
         }
       }
