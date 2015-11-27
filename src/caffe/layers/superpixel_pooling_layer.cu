@@ -41,9 +41,9 @@ namespace caffe {
           spixel_data += (n * spixel_data_len + i) * 2;
           int row = (int)(spixel_data[0] * h_ratio);
           int col = (int)(spixel_data[1] * w_ratio);
-          sum += image_data[((n * channels + c ) * image_height + row) * image_width + col]
-          / (end_ind - start_ind);
+          sum += image_data[((n * channels + c ) * image_height + row) * image_width + col];
         }
+        sum /= (end_ind - start_ind);
       }
       top_data[(n * (spixel_ptr_len - 1) + spixel) * channels + c] = sum;
     }
