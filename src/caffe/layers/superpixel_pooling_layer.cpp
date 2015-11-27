@@ -92,7 +92,12 @@ namespace caffe {
             const Dtype* spixel_ptr = bottom[2]->cpu_data();
             const Dtype* spixel_num = bottom[3]->cpu_data();
             const Dtype* mask_size = bottom[4]->cpu_data();
-
+            int spixel_ptr_len = spixel_ptr_len_;
+            int channels = channels_;
+            int spixel_data_len = spixel_data_len;
+            int image_height = image_height_
+            int image_width = image_width_;
+            
             Dtype sum = 0;
             if(spixel < spixel_num[n]) {
               spixel_ptr += n * spixel_ptr_len + spixel;
