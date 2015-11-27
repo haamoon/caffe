@@ -259,12 +259,12 @@ namespace caffe {
         LOG(ERROR) << "row2 = " << row2 << ", " << c_row2 << " col2 = " << col2 << ", " << c_col2;
         
         for(int c = 0; c < 3; c++) {
-          Dtype sum = image_array[n * this->image_->count(2) +
+          Dtype sum = (image_array[n * this->image_->count(2) +
                                   c * this->image_->count(3) +
                                   c_row1 * this->w + c_col1] +
                       image_array[n * this->image_->count(2) +
                                   c * this->image_->count(3) +
-                                  c_row2 * this->w + c_col2];
+                                  c_row2 * this->w + c_col2]) / 2;
           EXPECT_EQ(sum, output_array[n * this->output_->count(2) + sp * 3 + c]);
         }
       }
