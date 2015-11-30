@@ -64,6 +64,7 @@ namespace caffe {
   template <typename Dtype>
   void SuperpixelPoolingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
                                                   const vector<Blob<Dtype>*>& top) {
+    
     const Dtype* image_data = bottom[0]->cpu_data();
     const Dtype* spixel_data = bottom[1]->cpu_data();
     const Dtype* spixel_ptr = bottom[2]->cpu_data();
@@ -84,46 +85,11 @@ namespace caffe {
       for (int c = 0; c < channels_; ++c) {
         //iterate over superpixels
         for(int spixel = 0; spixel < spixel_num[n]; ++spixel) {
-          
-          /////////////////////////////test
-          {
-            const Dtype* image_data = bottom[0]->cpu_data();
-            const Dtype* spixel_data = bottom[1]->cpu_data();
-            const Dtype* spixel_ptr = bottom[2]->cpu_data();
-            const Dtype* spixel_num = bottom[3]->cpu_data();
-            const Dtype* mask_size = bottom[4]->cpu_data();
-            int spixel_ptr_len = spixel_ptr_len_;
-            int channels = channels_;
-            int spixel_data_len = spixel_data_len;
-            int image_height = image_height_;
-            int image_width = image_width_;
-            
-            Dtype sum = 0;
-            if(spixel < spixel_num[n]) {
-              spixel_ptr += n * spixel_ptr_len + spixel;
-              int start_ind = spixel_ptr[0];
-              int end_ind = spixel_ptr[1];
-            
-              mask_size += 2 * n;
-              Dtype h_ratio = image_height / mask_size[0];
-              Dtype w_ratio = image_width / mask_size[1];
-            
-              for(int i = start_ind; i < end_ind; i++) {
-                spixel_data += (n * spixel_data_len + i) * 2;
-                int row = (int)(spixel_data[0] * h_ratio);
-                int col = (int)(spixel_data[1] * w_ratio);
-                sum += image_data[((n * channels + c ) * image_height + row) * image_width + col];
-              }
-              sum /= (end_ind - start_ind);
-            }
-            top_data[(n * (spixel_ptr_len - 1) + spixel) * channels + c] = sum;
-          }
-          ////////////////
-          
           CHECK_LT(spixel_num[n], spixel_ptr_len_) << "Number of superpixels" <<
     						" exceeds the maximum lenght of the ptr";
           int start_ind = spixel_ptr[spixel];
           int end_ind = spixel_ptr[spixel + 1];
+
           for(int i = start_ind; i < end_ind; i++) {
             int row = (int)(spixel_data[i * 2] * h_ratio);
             int col = (int)(spixel_data[i * 2 + 1] * w_ratio);

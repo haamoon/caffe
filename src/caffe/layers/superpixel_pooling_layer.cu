@@ -36,11 +36,10 @@ namespace caffe {
         mask_size += 2 * n;
         Dtype h_ratio = image_height / mask_size[0];
         Dtype w_ratio = image_width / mask_size[1];
-        
+        spixel_data += (n * spixel_data_len + start_ind) * 2;
         for(int i = start_ind; i < end_ind; i++) {
-          spixel_data += (n * spixel_data_len + i) * 2;
-          int row = (int)(spixel_data[0] * h_ratio);
-          int col = (int)(spixel_data[1] * w_ratio);
+          int row = (int)(*(spixel_data++) * h_ratio);
+          int col = (int)(*(spixel_data++) * w_ratio);
           sum += image_data[((n * channels + c ) * image_height + row) * image_width + col];
         }
         sum /= (end_ind - start_ind);
@@ -64,6 +63,7 @@ namespace caffe {
       int spixel = tmp / channels;
       
       if(spixel < spixel_num[n]) {
+        Dtype sum = 0;
         spixel_ptr += n * spixel_ptr_len + spixel;
         int start_ind = spixel_ptr[0];
         int end_ind = spixel_ptr[1];
@@ -71,16 +71,17 @@ namespace caffe {
         mask_size += 2 * n;
         Dtype h_ratio = image_height / mask_size[0];
         Dtype w_ratio = image_width / mask_size[1];
-        
+        spixel_data += (n * spixel_data_len + start_ind) * 2;
         for(int i = start_ind; i < end_ind; i++) {
-          spixel_data += (n * spixel_data_len + i) * 2;
-          int row = (int)(spixel_data[0] * h_ratio);
-          int col = (int)(spixel_data[1] * w_ratio);
-          bottom_diff[((n * channels + c ) * image_height + row) * image_width + col] =
-          top_diff[(n * (spixel_ptr_len - 1) + spixel) * channels + c]
-          / (end_ind - start_ind);
+          int row = (int)(*(spixel_data++) * h_ratio);
+          int col = (int)(*(spixel_data++) * w_ratio);
+          bottom_diff[((n * channels + c ) * image_height + row) *
+                      image_width + col] +=
+                      top_diff[(n * (spixel_ptr_len - 1) + spixel) *
+                      channels + c] / (end_ind - start_ind);
         }
       }
+      
     }
   }
   
