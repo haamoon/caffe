@@ -1,6 +1,9 @@
 from __future__ import division
-import caffe
+caffe_root = '../../'  # this file is expected to be in {caffe_root}/tracker_model/Dec_AlexNet
+import sys
 import numpy as np
+sys.path.insert(0, caffe_root + 'python')
+import caffe
 
 def upsample_filt(size):
 # make a bilinear interpolation kernel
@@ -21,15 +24,15 @@ def interp_surgery(net, layers):
         m, k, h, w = net.params[l][0].data.shape
         if m != k:
             print 'input + output channels need to be the same'
-            raise
+            raise Exception
         if h != w:
             print 'filters need to be square'
-            raise
+            raise Exception
         filt = upsample_filt(h)
         net.params[l][0].data[range(m), range(k), :, :] = filt
 
 # base net -- the learned coarser model
-base_weights = 'fcn-16s-pascalcontext.caffemodel'
+base_weights = 'fcn-alexnet-pascal.caffemodel'
 
 # init
 caffe.set_mode_gpu()
@@ -38,8 +41,8 @@ caffe.set_device(0)
 solver = caffe.SGDSolver('solver.prototxt')
 
 # do net surgery to set the deconvolution weights for bilinear interpolation
-interp_layers = [k for k in solver.net.params.keys() if 'up' in k]
-interp_surgery(solver.net, interp_layers)
+#interp_layers = [k for k in solver.net.params.keys() if 'deconv' in k]
+#interp_surgery(solver.net, interp_layers)
 
 # copy base weights for fine-tuning
 solver.net.copy_from(base_weights)

@@ -220,6 +220,15 @@ class ConvolutionLayer : public BaseConvolutionLayer<Dtype> {
       : BaseConvolutionLayer<Dtype>(param) {}
 
   virtual inline const char* type() const { return "Convolution"; }
+  virtual inline DiagonalAffineMap<Dtype> coord_map() {
+    const int* kernel_shape_data = this->kernel_shape_.cpu_data();
+    const int* stride_data = this->stride_.cpu_data();
+    const int* pad_data = this->pad_.cpu_data();
+    return FilterMap<Dtype>(this->num_spatial_axes_, kernel_shape_data, stride_data, pad_data).inv();
+    
+    //return FilterMap<Dtype>(this->kernel_h_, this->kernel_w_, this->stride_h_,
+    //                        this->stride_w_, this->pad_h_, this->pad_w_).inv();
+  }
 
  protected:
   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
@@ -253,8 +262,16 @@ class DeconvolutionLayer : public BaseConvolutionLayer<Dtype> {
  public:
   explicit DeconvolutionLayer(const LayerParameter& param)
       : BaseConvolutionLayer<Dtype>(param) {}
-
   virtual inline const char* type() const { return "Deconvolution"; }
+  virtual inline DiagonalAffineMap<Dtype> coord_map() {
+    const int* kernel_shape_data = this->kernel_shape_.cpu_data();
+    const int* stride_data = this->stride_.cpu_data();
+    const int* pad_data = this->pad_.cpu_data();
+    return FilterMap<Dtype>(this->num_spatial_axes_, kernel_shape_data, stride_data, pad_data);
+    
+//    return FilterMap<Dtype>(this->kernel_h_, this->kernel_w_, this->stride_h_,
+//        this->stride_w_, this->pad_h_, this->pad_w_);
+  }
 
  protected:
   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
@@ -396,6 +413,9 @@ class LRNLayer : public Layer<Dtype> {
   virtual inline const char* type() const { return "LRN"; }
   virtual inline int ExactNumBottomBlobs() const { return 1; }
   virtual inline int ExactNumTopBlobs() const { return 1; }
+  virtual inline DiagonalAffineMap<Dtype> coord_map() {
+    return DiagonalAffineMap<Dtype>::identity(2);
+  }
 
  protected:
   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
@@ -537,6 +557,10 @@ class PoolingLayer : public Layer<Dtype> {
     return (this->layer_param_.pooling_param().pool() ==
             PoolingParameter_PoolMethod_MAX) ? 2 : 1;
   }
+  virtual inline DiagonalAffineMap<Dtype> coord_map() {
+    return FilterMap<Dtype>(kernel_h_, kernel_w_, stride_h_, stride_w_,
+        pad_h_, pad_w_).inv();
+  }
 
  protected:
   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
@@ -617,6 +641,7 @@ class SPPLayer : public Layer<Dtype> {
       const vector<Blob<Dtype>*>& top);
   virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+
   // calculates the kernel and stride dimensions for the pooling layer,
   // returns a correctly configured LayerParameter for a PoolingLayer
   virtual LayerParameter GetPoolingParam(const int pyramid_level,
@@ -654,6 +679,41 @@ class SPPLayer : public Layer<Dtype> {
   shared_ptr<ConcatLayer<Dtype> > concat_layer_;
 };
 
+
+
+  template <typename Dtype>
+  class CropLayer : public Layer<Dtype> {
+  public:
+    explicit CropLayer(const LayerParameter& param)
+    : Layer<Dtype>(param) {}
+    virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+                            const vector<Blob<Dtype>*>& top);
+    virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+                         const vector<Blob<Dtype>*>& top);
+    
+    virtual inline const char* type() const { return "Crop"; }
+    virtual inline int ExactNumBottomBlobs() const { return 2; }
+    virtual inline int ExactNumTopBlobs() const { return 1; }
+    virtual inline DiagonalAffineMap<Dtype> coord_map() {
+      vector<pair<Dtype, Dtype> > coefs;
+      coefs.push_back(make_pair(1, - crop_h_));
+      coefs.push_back(make_pair(1, - crop_w_));
+      return DiagonalAffineMap<Dtype>(coefs);
+    }
+    
+  protected:
+    virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+                             const vector<Blob<Dtype>*>& top);
+    virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+                              const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+    virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+                             const vector<Blob<Dtype>*>& top);
+    virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+                              const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+    int crop_h_, crop_w_;
+  };
+  
+  
 }  // namespace caffe
 
 #endif  // CAFFE_VISION_LAYERS_HPP_
