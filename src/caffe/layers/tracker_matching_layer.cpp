@@ -56,7 +56,7 @@ void TrackerMatchingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom
   
   Dtype* top_data = top[0]->mutable_cpu_data();
   int max_index = 0;
-//   LOG(ERROR) << "MATCHING:" << max_ntrack_ << ", " << max_nseg_ << ", " << N_ << ", " << top[0]->count() << ", " << bottom[0]->count();
+  //LOG(ERROR) << "MATCHING:" << max_ntrack_ << ", " << max_nseg_ << ", " << N_ << ", " << top[0]->count() << ", " << bottom[0]->count();
   for(int n = 0; n < N_; ++n) {
     for(int track = 0; track < max_ntrack_; ++track) {
       max_index = 0;
@@ -65,6 +65,7 @@ void TrackerMatchingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom
           max_index = seg;
         }
       }
+      //LOG(ERROR) << "N = " << n << " track = " << track << " max index = " << max_index;
       caffe_copy(max_nseg_, overlaps_data + max_index * max_nseg_, top_data);
       v_data += max_nseg_;
       top_data += max_nseg_;

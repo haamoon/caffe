@@ -53,7 +53,7 @@ template <typename Dtype>
 void SwitchLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     const vector<bool>& propagate_down,
     const vector<Blob<Dtype>*>& bottom) {
-  CHECK(!propagate_down[1]) << "Can not propagate to the switch gate!";
+  //CHECK(!propagate_down[1]) << "Can not propagate to the switch gate!";
     
 	const Dtype* switch_data = bottom[1]->gpu_data();
 	const Dtype* top_diff = top[0]->gpu_diff();

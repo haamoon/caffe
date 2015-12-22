@@ -26,9 +26,9 @@ __global__ void RowPoolingForward(const int nthreads,
   
     Dtype sum = 0;
     if(seg < seg_num[n]) {
-      seg_ptr += n * (max_nseg + 1) + seg;
-      int start_ind = seg_ptr[0]; 
-      int end_ind = seg_ptr[1];
+      const Dtype* cur_seg_ptr = seg_ptr + n * (max_nseg + 1) + seg;
+      int start_ind = cur_seg_ptr[0]; 
+      int end_ind = cur_seg_ptr[1];
       for(int i = start_ind; i < end_ind; i++) {
       sum += matrix_data[ n * n_mat_elem 
               + (int)seg_data[n * seg_data_len + i] * ncol + col] 
@@ -50,11 +50,11 @@ __global__ void RowPoolingBackward(const int nthreads,
     int col = index % ncol;
     int n = index / ncol;
   
+    const Dtype* cur_seg_ptr = seg_ptr + n * (max_nseg + 1);
     //iterate over segments
     for(int seg = 0; seg < seg_num[n]; ++seg) {
-      seg_ptr += n * (max_nseg + 1) + seg;
-      int start_ind = seg_ptr[0]; 
-      int end_ind = seg_ptr[1];
+      int start_ind = *(cur_seg_ptr++);
+      int end_ind = *cur_seg_ptr;
     
       for(int i = start_ind; i < end_ind; i++) {
         bottom_diff[n * n_mat_elem + 
@@ -79,7 +79,7 @@ void RowPoolingLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
   const int top_count = top[0]->count();
       
   RowPoolingForward<Dtype><<<CAFFE_GET_BLOCKS(top_count), CAFFE_CUDA_NUM_THREADS>>>(
-      top_count, matrix_data, seg_data, seg_ptr, seg_num, bottom[0]->count(start_axes_), 
+    top_count, matrix_data, seg_data, seg_ptr, seg_num, bottom[0]->count(bottom[0]->CanonicalAxisIndex(-2)), 
       ncol_, seg_coef, seg_data_len_, N_, seg_ptr_len_ - 1, top_data);
     
 }
@@ -108,7 +108,7 @@ void RowPoolingLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   
   int count = N_ * ncol_;
   RowPoolingBackward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
-    count, top_diff, seg_data, seg_ptr, seg_num, bottom[0]->count(start_axes_), 
+    count, top_diff, seg_data, seg_ptr, seg_num, bottom[0]->count(bottom[0]->CanonicalAxisIndex(-2)), 
     ncol_, seg_coef, seg_data_len_, seg_ptr_len_ - 1, bottom_diff);
 }
 

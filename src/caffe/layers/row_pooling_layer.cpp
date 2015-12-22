@@ -19,41 +19,39 @@ void RowPoolingLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
 template <typename Dtype>
 void RowPoolingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
+
   
-  start_axes_ = bottom[0]->num_axes() - 2;
-  CHECK_GE(0, start_axes_) << "Input(0) image must have at least 2 axes, "
+  CHECK_GE(bottom[0]->num_axes(), 3) << "Input(0) image must have at least 3 axes, "
       << "corresponding to (..., row, col)";
-  CHECK_EQ(start_axes_ + 1, bottom[1]->num_axes()) << "Input(1) seg_data must have " << start_axes_ + 1 << " axes, "
+  CHECK_GE(bottom[1]->num_axes(), 2) << "Input(1) seg_data must have at least 2 axes, "
       << "corresponding to (..., segment_inds)";
-  CHECK_EQ(start_axes_ + 1, bottom[2]->num_axes()) << "Input(2) seg_ptr must have " << start_axes_ + 1 << " axes, "
+  CHECK_GE(bottom[2]->num_axes(), 2) << "Input(2) seg_ptr must have at least 2 axes, "
       << "corresponding to (..., segment_start_inds)";
-  CHECK_EQ(start_axes_, bottom[3]->num_axes()) << "Input(3) seg_num must have " << start_axes_ << " axes, "
+  CHECK_GE(bottom[3]->num_axes(), 1) << "Input(3) seg_num must have at least 1 axes, "
       << "corresponding to (...)";
-  CHECK_EQ(start_axes_ + 1, bottom[3]->num_axes()) << "Input(4) seg_coef must have " << start_axes_ + 1 << " axes, "
+  CHECK_GE(bottom[4]->num_axes(), 2) << "Input(4) seg_coef must have at least 2 axes, "
       << "corresponding to (..., seg_coef)";
-      
-  N_ = bottom[0]->count(0, start_axes_);
-  nrow_ = bottom[0]->shape(start_axes_);
-  ncol_ = bottom[0]->shape(start_axes_ + 1);  
   
-  //seg_data is a N_ x seg_data_len_ matrix
-  seg_data_len_ = bottom[1]->shape(start_axes_); 
+  int input_start_axis = bottom[0]->CanonicalAxisIndex(-2);
+  N_ = bottom[0]->count(0, input_start_axis);
+  nrow_ = bottom[0]->shape(input_start_axis);
+  ncol_ = bottom[0]->shape(input_start_axis + 1);  
   
-  //seg_ptr is a N_ x seg_ptr_len_ matrix
-  seg_ptr_len_ = bottom[2]->shape(start_axes_);
+  //seg_data is a ... x seg_data_len_ matrix
+  seg_data_len_ = bottom[1]->shape(bottom[1]->CanonicalAxisIndex(-1)); 
   
-  CHECK_EQ(N_, bottom[1]->count(0, start_axes_));
-  CHECK_EQ(N_, bottom[2]->count(0, start_axes_));
-  CHECK_EQ(N_, bottom[3]->count(0, start_axes_));
-  CHECK_EQ(N_, bottom[4]->count(0, start_axes_));
-  CHECK_EQ(seg_data_len_, bottom[4]->shape(start_axes_));
+  //seg_ptr is a ... x seg_ptr_len_ matrix
+  seg_ptr_len_ = bottom[2]->shape(bottom[2]->CanonicalAxisIndex(-1));
+  
+  CHECK_EQ(N_, bottom[1]->count(0, bottom[1]->CanonicalAxisIndex(-1)));
+  CHECK_EQ(N_, bottom[2]->count(0, bottom[2]->CanonicalAxisIndex(-1)));
+  CHECK_EQ(N_, bottom[3]->count(0, bottom[3]->CanonicalAxisIndex(-1) + 1));
+  CHECK_EQ(N_, bottom[4]->count(0, bottom[4]->CanonicalAxisIndex(-1)));
+  CHECK_EQ(seg_data_len_, bottom[4]->shape(bottom[1]->CanonicalAxisIndex(-1)));
   
   //num of segments is (seg_ptr_len_ - 1)
   //X_t = top is a (seg_ptr_len_ - 1) x ncol_ matrix
-  vector<int> top_shape;
-  for(int i = 0; i < start_axes_; i++) {
-    top_shape.push_back(bottom[0]->shape(i));
-  }
+  vector<int> top_shape = bottom[3]->shape();
   top_shape.push_back(seg_ptr_len_ - 1);
   top_shape.push_back(ncol_);
   
@@ -63,6 +61,7 @@ void RowPoolingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
 template <typename Dtype>
 void RowPoolingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
+
   const Dtype* matrix_data = bottom[0]->cpu_data();
   const Dtype* seg_data = bottom[1]->cpu_data();
   const Dtype* seg_ptr = bottom[2]->cpu_data();
@@ -77,20 +76,22 @@ void RowPoolingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   }
   
   // The main loop
-  for (int n = 0; n < bottom[0]->num(); ++n) {
+  for (int n = 0; n < N_; ++n) {
     //iterate over segments
+    //LOG(ERROR) << "seg_num[n] " << seg_num[n];
     for(int seg = 0; seg < seg_num[n]; ++seg) {
-      int start_ind = seg_ptr[seg]; 
+      int start_ind = seg_ptr[seg];
       int end_ind = seg_ptr[seg + 1];
+      //LOG(ERROR) << "n = " << n << " start, end = " << start_ind << ", " << end_ind;
       for (int col = 0; col < ncol_; ++col) {
         for(int i = start_ind; i < end_ind; i++) {
           top_data[seg * ncol_ + col] += matrix_data[(int)(seg_data[i]) * ncol_ + col] * seg_coef[i];
         }
       }
     }
-    matrix_data += bottom[0]->count(start_axes_);
+    matrix_data += bottom[0]->count(bottom[0]->CanonicalAxisIndex(-2));
     seg_coef += seg_data_len_;
-    top_data += ncol_ * (seg_ptr_len_ - 1);   	
+    top_data += ncol_ * (seg_ptr_len_ - 1);
     seg_ptr += seg_ptr_len_;
     seg_data += seg_data_len_;
   }
@@ -133,7 +134,7 @@ void RowPoolingLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
         }
       }
     }
-    bottom_diff += bottom[0]->count(start_axes_);
+    bottom_diff += bottom[0]->count(bottom[0]->CanonicalAxisIndex(-2));
     seg_coef += seg_data_len_;
     top_diff += ncol_ * (seg_ptr_len_ - 1);	
     seg_ptr += seg_ptr_len_;

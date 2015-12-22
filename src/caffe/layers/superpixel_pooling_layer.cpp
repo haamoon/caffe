@@ -19,42 +19,38 @@ namespace caffe {
   template <typename Dtype>
   void SuperpixelPoolingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
                                               const vector<Blob<Dtype>*>& top) {
-    start_axes_ = bottom[0]->num_axes() - 3;
     
-    CHECK_GE(start_axes_, 0) << "Input(1) image must have at least 3 axes, "
+    CHECK_GE(bottom[0]->num_axes(), 4) << "Input(1) image must have at least 4 axes, "
     << "corresponding to (..., channels, height, width)";
     
-    CHECK_EQ(start_axes_ + 2, bottom[1]->num_axes()) << "Input(2) spixel_data must have " << start_axes_ + 2 << " axes, "
+    CHECK_GE(bottom[1]->num_axes(), 3) << "Input(2) spixel_data must have 3 axes, "
     << "corresponding to (..., pixel_id, row_num = 0/column_num = 1)";
-    CHECK_EQ(start_axes_ + 1, bottom[2]->num_axes()) << "Input(3) spixel_ptr must have " << start_axes_ + 1 << " axes, "
+    CHECK_GE(bottom[2]->num_axes(), 2) << "Input(3) spixel_ptr must have 2 axes, "
     << "corresponding to (..., ptr)";
-    CHECK_EQ(start_axes_, bottom[3]->num_axes()) << "Input(4) spixel_num must have " << start_axes_ << " axes";
-    CHECK_EQ(start_axes_ + 1, bottom[4]->num_axes()) << "Input(5) mask_size must have " << start_axes_ + 1 << " axes, "
+    CHECK_GE(bottom[3]->num_axes(), 1) << "Input(4) spixel_num must have 1 axes";
+    CHECK_GE(bottom[4]->num_axes(), 2) << "Input(5) mask_size must have 2 axes, "
     << "corresponding to (..., height = 0/width = 1)";
     
-    N_ = bottom[0]->count(0, start_axes_);
-    CHECK_EQ(N_, bottom[1]->count(0, start_axes_));
-    CHECK_EQ(N_, bottom[2]->count(0, start_axes_));
-    CHECK_EQ(N_, bottom[3]->count(0, start_axes_));
-    CHECK_EQ(N_, bottom[4]->count(0, start_axes_));
+    int input_start_axis = bottom[0]->CanonicalAxisIndex(-3);
+    N_ = bottom[0]->count(0, input_start_axis);
+    CHECK_EQ(N_, bottom[1]->count(0, bottom[1]->CanonicalAxisIndex(-2)));
+    CHECK_EQ(N_, bottom[2]->count(0, bottom[2]->CanonicalAxisIndex(-1)));
+    CHECK_EQ(N_, bottom[3]->count(0, bottom[3]->CanonicalAxisIndex(-1) + 1));
+    CHECK_EQ(N_, bottom[4]->count(0, bottom[4]->CanonicalAxisIndex(-1)));
     
-    channels_ = bottom[0]->shape(start_axes_);
-    image_height_ = bottom[0]->shape(start_axes_ + 1);
-    image_width_ = bottom[0]->shape(start_axes_ + 2);
+    channels_ = bottom[0]->shape(input_start_axis);
+    image_height_ = bottom[0]->shape(input_start_axis + 1);
+    image_width_ = bottom[0]->shape(input_start_axis + 2);
     
     //bottom[1] has size ... x spixel_data_len_ x 2
-    spixel_data_len_ = bottom[1]->shape(start_axes_);
-    
+    spixel_data_len_ = bottom[1]->shape(bottom[1]->CanonicalAxisIndex(-2));
     
     //bottom[2] has segmens starting indeces with size ... x spixel_ptr_len_
-    spixel_ptr_len_ = bottom[2]->shape(start_axes_);
+    spixel_ptr_len_ = bottom[2]->shape(bottom[2]->CanonicalAxisIndex(-1));
     
     //X_t = top is a (spixel_ptr_len_ - 1) x channels_ matrix
     // We need s+1 pointer to show start,end pairs of spixels in spixel_data
-    vector<int> top_shape;
-    for(int i = 0; i < start_axes_; i++) {
-      top_shape.push_back(bottom[0]->shape(i));
-    }
+    vector<int> top_shape = bottom[3]->shape();
     top_shape.push_back(spixel_ptr_len_ - 1);
     top_shape.push_back(channels_);
     
@@ -96,7 +92,7 @@ namespace caffe {
             top_data[spixel * channels_ + c] += image_data[row * image_width_ + col]/(end_ind - start_ind);
           }
         }
-        image_data += bottom[0]->count(start_axes_ + 1);
+        image_data += bottom[0]->count(bottom[0]->CanonicalAxisIndex(-2));
       }
       top_data += channels_ * (spixel_ptr_len_ - 1);
       spixel_ptr += spixel_ptr_len_;
@@ -137,6 +133,7 @@ namespace caffe {
         for(int spixel = 0; spixel < spixel_num[n]; ++spixel) {
           int start_ind = spixel_ptr[spixel];
           int end_ind = spixel_ptr[spixel + 1];
+          CHECK_GE(end_ind, start_ind);
           for(int i = start_ind; i < end_ind; i++) {
             int row = (int)(spixel_data[i * 2] * h_ratio);
             int col = (int)(spixel_data[i * 2 + 1] * w_ratio);
@@ -144,7 +141,7 @@ namespace caffe {
               top_diff[spixel * channels_ + c]/(end_ind - start_ind);
           }
         }
-        bottom_diff += bottom[0]->count(start_axes_ + 1);
+        bottom_diff += bottom[0]->count(bottom[0]->CanonicalAxisIndex(-2));
       }
       top_diff += channels_ * (spixel_ptr_len_ - 1);  	
       spixel_ptr += spixel_ptr_len_;

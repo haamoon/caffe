@@ -254,6 +254,17 @@ void RecurrentLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   }
 
   unrolled_net_->ForwardPrefilled();
+  
+  //Amirreza: I add this part here! 
+  //In the ForwardPrefilled Reshape of every layers are called
+  //This cuase problem for the layers that share their data with
+  //top layer.
+  //So I need to call it again to make sure it output_blobs_ are
+  //reconnected to the top in these cases.
+  for (int i = 0; i < top.size(); ++i) {
+    top[i]->ShareData(*output_blobs_[i]);
+    top[i]->ShareDiff(*output_blobs_[i]);
+  }
 }
 
 template <typename Dtype>

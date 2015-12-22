@@ -106,8 +106,8 @@ namespace caffe {
       
       //spixel_ptr_ shape: T_ x N_ x spixel_ptr_len
       vector<int> spixel_ptr_shape;
-      spixel_ptr_shape.push_back(T);
-      spixel_ptr_shape.push_back(N);
+      //spixel_ptr_shape.push_back(T);
+      spixel_ptr_shape.push_back(T * N);
       spixel_ptr_shape.push_back(spixel_ptr_len);
       spixel_ptr_->Reshape(spixel_ptr_shape);
       
@@ -151,11 +151,11 @@ namespace caffe {
       mask_size_array[0] = h;
       mask_size_array[1] = w;
       
-      mask_size_array[2] = h * 2;
+      mask_size_array[2] = h * 1;
       mask_size_array[3] = w;
       
       mask_size_array[4] = h;
-      mask_size_array[5] = w * 2;
+      mask_size_array[5] = w * 1;
       
       mask_size_array[6] = h * 2;
       mask_size_array[7] = w * 2;
