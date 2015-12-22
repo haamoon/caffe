@@ -1,0 +1,19 @@
+name: "Multiplier"
+
+input: "a"
+input_shape { dim: 1 dim: 1 dim: 1800 dim: 256}
+
+input: "b"
+input_shape { dim: 1 dim: 1 dim: 1800 dim: 256}
+
+layer {
+  name: "mult"
+  type: "MatMult"
+  bottom: "a"
+  bottom: "b"
+  top: "c"
+  matmult_param {
+    transpose_a: true
+  }
+}
+

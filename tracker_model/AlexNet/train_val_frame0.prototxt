@@ -1,0 +1,375 @@
+name: "Tracker"
+
+# train data layers
+layer {
+  name: "images"
+  type: "ImageData"
+  top: "image"
+  top: "ilabel"
+  include { phase: TRAIN }
+  transform_param {
+    mean_value: 104
+    mean_value: 117
+    mean_value: 123
+  }
+  image_data_param {
+    source: "./tracker_model/data/SegTrackv2_hdf5/images.txt"
+    batch_size: 2
+#    new_height: 
+#    new_width: 
+    shuffle: false
+  }
+}
+
+layer {
+  name: "data"
+  type: "HDF5Data"
+  top: "cont"
+  top: "mask_size"
+  top: "spixel_data"
+  top: "spixel_ptr"
+  top: "spixel_num"
+  top: "seg_data"
+  top: "seg_ptr"
+  top: "seg_num"
+  top: "seg_coef"
+  top: "overlaps"
+  include { phase: TRAIN }
+  hdf5_data_param {
+    source: "./tracker_model/data/SegTrackv2_hdf5/seq_data.txt"
+    batch_size: 2
+  }
+}
+
+# AlexNet data layers
+layer {
+  name: "conv1"
+  type: "Convolution"
+  bottom: "image"
+  top: "conv1"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 96
+    kernel_size: 11
+    stride: 4
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+layer {
+  name: "relu1"
+  type: "ReLU"
+  bottom: "conv1"
+  top: "conv1"
+}
+layer {
+  name: "norm1"
+  type: "LRN"
+  bottom: "conv1"
+  top: "norm1"
+  lrn_param {
+    local_size: 5
+    alpha: 0.0001
+    beta: 0.75
+  }
+}
+layer {
+  name: "pool1"
+  type: "Pooling"
+  bottom: "norm1"
+  top: "pool1"
+  pooling_param {
+    pool: MAX
+    kernel_size: 3
+    stride: 2
+  }
+}
+layer {
+  name: "conv2"
+  type: "Convolution"
+  bottom: "pool1"
+  top: "conv2"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 256
+    pad: 2
+    kernel_size: 5
+    group: 2
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0.1
+    }
+  }
+}
+layer {
+  name: "relu2"
+  type: "ReLU"
+  bottom: "conv2"
+  top: "conv2"
+}
+layer {
+  name: "norm2"
+  type: "LRN"
+  bottom: "conv2"
+  top: "norm2"
+  lrn_param {
+    local_size: 5
+    alpha: 0.0001
+    beta: 0.75
+  }
+}
+layer {
+  name: "pool2"
+  type: "Pooling"
+  bottom: "norm2"
+  top: "pool2"
+  pooling_param {
+    pool: MAX
+    kernel_size: 3
+    stride: 2
+  }
+}
+layer {
+  name: "conv3"
+  type: "Convolution"
+  bottom: "pool2"
+  top: "conv3"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 384
+    pad: 1
+    kernel_size: 3
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+layer {
+  name: "relu3"
+  type: "ReLU"
+  bottom: "conv3"
+  top: "conv3"
+}
+layer {
+  name: "conv4"
+  type: "Convolution"
+  bottom: "conv3"
+  top: "conv4"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 384
+    pad: 1
+    kernel_size: 3
+    group: 2
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0.1
+    }
+  }
+}
+layer {
+  name: "relu4"
+  type: "ReLU"
+  bottom: "conv4"
+  top: "conv4"
+}
+layer {
+  name: "conv5"
+  type: "Convolution"
+  bottom: "conv4"
+  top: "conv5"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 256
+    pad: 1
+    kernel_size: 3
+    group: 2
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0.1
+    }
+  }
+}
+layer {
+  name: "relu5"
+  type: "ReLU"
+  bottom: "conv5"
+  top: "conv5"
+}
+layer {
+  name: "pool5"
+  type: "Pooling"
+  bottom: "conv5"
+  top: "pool5"
+  pooling_param {
+    pool: MAX
+    kernel_size: 3
+    stride: 2
+  }
+}
+  
+# feature pooling data layers
+layer {
+  name: "spixel_pooling1"
+  type: "SuperpixelPooling"
+  bottom: "pool5"
+  bottom: "spixel_data"
+  bottom: "spixel_ptr"
+  bottom: "spixel_num"
+  bottom: "mask_size"
+  top: "spixel_feature"
+}
+
+layer {
+  name: "rpixel_pooling1"
+  type: "RowPooling"
+  bottom: "spixel_feature"
+  bottom: "seg_data"
+  bottom: "seg_ptr"
+  bottom: "seg_num"
+  bottom: "seg_coef"
+  top: "seg_feature"
+}
+
+# tracker data layer
+layer {
+  name: "tracker"
+  type: "Tracker"
+  bottom: "seg_feature"
+  bottom: "overlaps"
+  bottom: "seg_num"
+  bottom: "cont"
+  top: "v"
+  top: "vtilde"
+#  top: "out_mx_1"
+#  top: "out_xmx_1"
+#  top: "out_m_1"
+#  top:"out_c_1"
+#  top:"out_c_2"
+#  top:"out_h_1"
+#  top:"out_h_2"
+#  top:"out_w_0"
+#  top:"out_w_1"
+#  top:"out_hm1_0"
+#  top:"out_hm1_1"
+#  top:"out_m_2"
+
+  tracker_param {
+    num_track: 1800
+    feature_dim: 256 
+    lambda: 1e3
+    use_softmax: false
+    use_vtilde_in_c: false
+  }
+}
+
+# loss data layer
+layer {
+  name: "reshape_v"
+  type: "Reshape"
+  bottom: "v"
+  top: "rv"
+  
+  reshape_param {
+    shape {
+      dim: -1
+    }
+    num_axes: 2
+  }
+}
+
+layer {
+  name: "reshape_vt"
+  type: "Reshape"
+  bottom: "vtilde"
+  top: "rvtilde"
+  propagate_down: false
+  reshape_param {
+    shape {
+      dim: -1
+    }
+    num_axes: 2
+  }
+}
+
+
+layer {
+  name: "reshape_overlaps"
+  type: "Reshape"
+  bottom: "overlaps"
+  top: "roverlaps"
+  propagate_down: false
+  reshape_param {
+    shape {
+      dim: -1
+    }
+    num_axes: 2
+  }
+}
+
+layer {
+  name: "euclideanLoss"
+  type: "EuclideanLoss"
+  bottom: "rv"
+  bottom: "roverlaps"
+  propagate_down: true
+  propagate_down: false
+}
