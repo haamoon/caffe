@@ -133,6 +133,36 @@ class SwitchLayer : public Layer<Dtype> {
   int N_;
 };
 
+  template <typename Dtype>
+  class SelectLayer : public Layer<Dtype> {
+  public:
+    
+    explicit SelectLayer(const LayerParameter& param)
+    : Layer<Dtype>(param) {}
+    
+    virtual inline const char* type() const { return "Select"; }
+    virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+                         const vector<Blob<Dtype>*>& top);
+  protected:
+    
+    virtual inline int ExactNumBottomBlobs() const { return 3; }
+    virtual inline int ExactNumTopBlobs() const { return 1; }
+    virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+                             const vector<Blob<Dtype>*>& top);
+    virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+                             const vector<Blob<Dtype>*>& top);
+    virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+                              const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+    virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+                              const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  private:
+    int num_track_;
+    int num_seg_;
+    int overlaps_offset_;
+    int input_offset_;
+    int N_;
+  };
+
 template <typename Dtype>
     class TrackerLayer : public RecurrentLayer<Dtype> {
   public:
@@ -142,7 +172,7 @@ template <typename Dtype>
     virtual inline const char* type() const { return "Tracker"; }
     virtual inline int MinBottomBlobs() const { return 4; }
     virtual inline int MaxBottomBlobs() const { return 4; }
-    virtual inline int ExactNumTopBlobs() const { return 2; }  
+    virtual inline int ExactNumTopBlobs() const;
   protected:
     virtual void FillUnrolledNet(NetParameter* net_param) const;
     virtual void RecurrentInputBlobNames(vector<string>* names) const;
@@ -220,7 +250,6 @@ class SuperpixelPoolingLayer : public Layer<Dtype> {
   	int channels_;
   	int image_height_;
 	int image_width_;
-	int start_axes_;
   	int spixel_data_len_;
   	int spixel_ptr_len_;
 };
@@ -256,12 +285,11 @@ class RowPoolingLayer : public Layer<Dtype> {
   virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
   private:
-  	int N_;
-  	int ncol_;
-  	int nrow_;
-  	int seg_data_len_;
-  	int seg_ptr_len_;
-	int start_axes_;
+    int N_;
+    int ncol_;
+    int nrow_;
+    int seg_data_len_;
+    int seg_ptr_len_;
 };
 
 /**
@@ -292,11 +320,9 @@ class TrackerMatchingLayer : public Layer<Dtype> {
   
   virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
-      NOT_IMPLEMENTED;
   }
   virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
-      NOT_IMPLEMENTED;
   }
         
   Blob<int> max_indeces_; 
