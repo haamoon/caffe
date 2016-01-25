@@ -67,6 +67,52 @@ class MatMultLayer : public Layer<Dtype> {
 };
 
 /**
+ * @brief HotMultLayer. Compute C = AxB when mode="ROW", and C = B x A when mode="COLUMN". A is one-hot representation of the first input
+ */
+template <typename Dtype>
+class HotMultLayer : public Layer<Dtype> {
+public:
+  virtual inline const char* type() const { return "HotMult"; }
+  explicit HotMultLayer(const LayerParameter& param)
+  : Layer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+                          const vector<Blob<Dtype>*>& top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+                       const vector<Blob<Dtype>*>& top);
+  
+  virtual inline int MinBottomBlobs() const { return 2; }
+  virtual inline int ExactNumTopBlobs() const { return 1; }
+  
+protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+                           const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+                           const vector<Blob<Dtype>*>& top);
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+                            const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+                            const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  
+private:
+  
+  void permute_row(int N, const Dtype* a, const Dtype* a_lens, int a_len, const Dtype* b, int b_row, int b_col, Dtype* c, int c_row, int c_col, bool from_ind_to_value);
+  void permute_col(int N, const Dtype* a, const Dtype* a_lens, int a_len, const Dtype* b, int b_row, int b_col, Dtype* c, int c_row, int c_col, bool from_ind_to_value);
+  /// @brief The spatial dimensions of the first input.
+  vector<int> a_shape_;
+  /// @brief The spatial dimensions of the second input.
+  vector<int> b_shape_;
+  
+  /// @brief The spatial dimensions of the output.
+  vector<int> c_shape_;
+  
+  int N_;
+  int b_c_;
+  int b_r_;
+  int a_len_;
+  bool row_mode_;
+};
+
+/**
  * @brief MatInvLayer. Compute A = (A + \lambda I)^{-1}.
  */
 template <typename Dtype>
@@ -81,8 +127,10 @@ class MatInvLayer : public Layer<Dtype> {
   virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
 
-  virtual inline int ExactNumBottomBlobs() const { return 1; }
+  virtual inline int MinBottomBlobs() const { return 1; }
+  virtual inline int MaxBottomBlobs() const { return 2; }
   virtual inline int ExactNumTopBlobs() const { return 1; }
+  
  protected:
   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
@@ -106,31 +154,35 @@ class MatInvLayer : public Layer<Dtype> {
 
 template <typename Dtype>
 class SwitchLayer : public Layer<Dtype> {
- public:
-
+public:
   explicit SwitchLayer(const LayerParameter& param)
-      : Layer<Dtype>(param) {}
-
-  virtual inline const char* type() const { return "Switch"; }
+  : Layer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+                          const vector<Blob<Dtype>*>& top);
+  
   virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
-      const vector<Blob<Dtype>*>& top);
- protected:
-
-  virtual inline int ExactNumBottomBlobs() const { return 2; }
+                       const vector<Blob<Dtype>*>& top);
+  
+  virtual inline const char* type() const { return "Switch"; }
+  
+  virtual inline int MinBottomBlobs() const { return 2; }
   virtual inline int ExactNumTopBlobs() const { return 1; }
+  
+protected:
   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
-  const vector<Blob<Dtype>*>& top);
+                           const vector<Blob<Dtype>*>& top);
   virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
-      const vector<Blob<Dtype>*>& top);
+                           const vector<Blob<Dtype>*>& top);
+  
   virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
-      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+                            const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
   virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
-      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
-  private:
-  int D_1_;
-  int D_2_;
-  int input_offset_;
-  int N_;
+                            const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  
+  int axis_;
+  int outer_dim_;
+  int selector_dim_;
+  int inner_dim_;
 };
 
   template <typename Dtype>
@@ -172,7 +224,7 @@ template <typename Dtype>
     virtual inline const char* type() const { return "Tracker"; }
     virtual inline int MinBottomBlobs() const { return 4; }
     virtual inline int MaxBottomBlobs() const { return 4; }
-    virtual inline int ExactNumTopBlobs() const;
+    virtual inline int ExactNumTopBlobs() const { return 2; }
   protected:
     virtual void FillUnrolledNet(NetParameter* net_param) const;
     virtual void RecurrentInputBlobNames(vector<string>* names) const;
@@ -181,6 +233,29 @@ template <typename Dtype>
     virtual void OutputBlobNames(vector<string>* names) const;
     virtual void InputBlobNames(vector<string>* names) const;
 };
+
+template <typename Dtype>
+class TrackerLossLayer : public RecurrentLayer<Dtype> {
+public:
+  explicit TrackerLossLayer(const LayerParameter& param)
+  : RecurrentLayer<Dtype>(param) {}
+  
+  virtual inline const char* type() const { return "TrackerLoss"; }
+  virtual inline int MinBottomBlobs() const { return 4; }
+  virtual inline int MaxBottomBlobs() const { return 4; }
+  virtual inline int ExactNumTopBlobs() const { return 1
+    //Debug
+    //+ 2
+    ; }
+protected:
+  virtual void FillUnrolledNet(NetParameter* net_param) const;
+  virtual void RecurrentInputBlobNames(vector<string>* names) const;
+  virtual void RecurrentOutputBlobNames(vector<string>* names) const;
+  virtual void RecurrentInputShapes(vector<BlobShape>* shapes) const;
+  virtual void OutputBlobNames(vector<string>* names) const;
+  virtual void InputBlobNames(vector<string>* names) const;
+};
+
 
 /**
  * @brief Pools the input image with respect to the segmentation mask by taking the average within segments.
