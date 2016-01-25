@@ -68,12 +68,16 @@ namespace caffe {
     }
     
     
-    void setbottom(vector<int> x_shape, int num_track = 5, float lambda = .5) {
+    void setbottom(vector<int> x_shape, int num_track = 5, float lambda = .5, bool use_softmax = false, float softmax_scale = 1.0, bool use_vtilde_in_c = false) {
       TrackerParameter* tracker_param = layer_param_.mutable_tracker_param();
       tracker_param->set_lambda(lambda);
       tracker_param->set_num_track(num_track);
       tracker_param->set_feature_dim(x_shape[3]);
+      tracker_param->set_use_softmax(use_softmax);
+      tracker_param->set_softmax_scale(softmax_scale);
+      tracker_param->set_use_vtilde_in_c(use_vtilde_in_c);
       this->num_track_ = num_track;
+      this->lambda_ = lambda;
       this->clear();
       
       
@@ -110,15 +114,16 @@ namespace caffe {
       vtilde_ = new Blob<Dtype>();
       
       filler.Fill(x_);
+      filler.Fill(overlaps_);
       
-      Dtype* overlap_data = overlaps_->mutable_cpu_data();
       
-      for(int i = 0; i < x_shape_[2] * x_shape_[0] * x_shape_[1]; i++) {
-        for(int j = 0; j < x_shape_[2]; j++) {
-          overlap_data[i * x_shape_[2] + j] = i;
-        }
-      }
+      //Dtype* overlap_data = overlaps_->mutable_cpu_data();
       
+      //for(int n = 0; n < x_shape_[0] * x_shape_[1]; n++) {
+     //   for(int i = 0; i < x_shape_[2]; i++) {
+     //     overlap_data[n * x_shape_[2] * x_shape_[2] + i * x_shape_[2] + i] = 1;
+     //   }
+     // }
       
       Dtype* cont_data = cont_->mutable_cpu_data();
       Dtype* seg_num_data = seg_num_->mutable_cpu_data();
@@ -187,7 +192,7 @@ namespace caffe {
     
     int T = 10;
     int N = 15;
-    int num_seg = 4;
+    int num_seg = 6;
     int num_dim = 3;
     int num_track = 5;
     float lambda = .5;
@@ -216,7 +221,7 @@ namespace caffe {
     EXPECT_EQ(this->vtilde_->shape(3), num_seg);
   }
   
-  TYPED_TEST(TrackerLayerTest, TestForwardT1) {
+  TYPED_TEST(TrackerLayerTest, TestForward) {
     typedef typename TypeParam::Dtype Dtype;
     vector<int> x_shape;
     
@@ -226,12 +231,14 @@ namespace caffe {
     int num_dim = 3;
     int num_track = 4;
     float lambda = .5;
-    
+    bool use_softmax = false;
+    float softmax_scale = 100.0;
+    bool use_vtilde_in_c = false;
     x_shape.push_back(T);
     x_shape.push_back(N);
     x_shape.push_back(num_seg);
     x_shape.push_back(num_dim);
-    this->setbottom(x_shape, num_track, lambda);
+    this->setbottom(x_shape, num_track, lambda, use_softmax, softmax_scale, use_vtilde_in_c);
     
     TrackerLayer<Dtype> tracker_layer(this->layer_param_);
     
@@ -262,6 +269,33 @@ namespace caffe {
     buffer << "num_track = " << num_track << ";" << endl;
     
     LOG(ERROR) << buffer.str();
+  }
+  
+  TYPED_TEST(TrackerLayerTest, TestTrackerLayerGradient) {
+    typedef typename TypeParam::Dtype Dtype;
+    
+    vector<int> x_shape;
+    
+    int T = 4;
+    int N = 2;
+    int num_seg = 10;
+    int num_dim = 3;
+    int num_track = 4;
+    float lambda = 2;
+    bool use_softmax = true;
+    float softmax_scale = 10.0;
+    bool use_vtilde_in_c = true;
+    x_shape.push_back(T);
+    x_shape.push_back(N);
+    x_shape.push_back(num_seg);
+    x_shape.push_back(num_dim);
+    this->setbottom(x_shape, num_track, lambda, use_softmax, softmax_scale, use_vtilde_in_c);
+    
+    TrackerLayer<Dtype> tracker_layer(this->layer_param_);
+    
+    GradientChecker<Dtype> checker(1e-2, 1e-2);
+    checker.CheckGradient(&tracker_layer, this->blob_bottom_vec_,
+                          this->blob_top_vec_, 0);
   }
   
 }  // namespace caffe

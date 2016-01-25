@@ -86,6 +86,39 @@ namespace caffe {
     }
   }
   
+//   template <typename Dtype>
+//   __global__ void UnscaledSuperpixelPoolingBackward(const int nthreads,
+//                                             const Dtype* top_diff, const Dtype* spixel_data, const Dtype* spixel_ptr,
+//                                             const Dtype* spixel_num, int image_width, int image_height,
+//                                             const Dtype* mask_size, int N, int spixel_ptr_len, int spixel_data_len,
+//                                             int channels, Dtype* bottom_diff) {
+//     //nthreads = N_ * channels_ * spixel_num
+//     CUDA_KERNEL_LOOP(index, nthreads) {
+//       int tmp = index;
+//       int n =  tmp % N;
+//       tmp /= N;
+//       int c = tmp % channels;
+//       int spixel = tmp / channels;
+//       
+//       if(spixel < spixel_num[n]) {
+//         Dtype sum = 0;
+//         spixel_ptr += n * spixel_ptr_len + spixel;
+//         int start_ind = spixel_ptr[0];
+//         int end_ind = spixel_ptr[1];
+//         
+//         spixel_data += (n * spixel_data_len + start_ind) * 2;
+//         for(int i = start_ind; i < end_ind; i++) {
+//           int row = *(spixel_data++);
+//           int col = *(spixel_data++);
+//           bottom_diff[((n * channels + c ) * image_height + row) *
+//           image_width + col] +=
+//           top_diff[(n * (spixel_ptr_len - 1) + spixel) *
+//           channels + c] / (end_ind - start_ind);
+//         }
+//       }
+//     }
+//   }
+                                            
   template <typename Dtype>
   void SuperpixelPoolingLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
                                                   const vector<Blob<Dtype>*>& top) {

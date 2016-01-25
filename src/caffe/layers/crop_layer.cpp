@@ -51,13 +51,19 @@ void CropLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   // Compute the coord map from the blob of intersection to each bottom.
   vector<DiagonalAffineMap<Dtype> > coord_maps(2,
       DiagonalAffineMap<Dtype>::identity(2));
-  for (int i = 0; i < 2; ++i) {
-    for (Blob<Dtype>* blob = bottom[i]; blob != inter_blob;
-         blob = this->net_->bottom_vecs()[down_map[blob]][0]) {
-      shared_ptr<Layer<Dtype> > layer = this->net_->layers()[down_map[blob]];
-      coord_maps[i] = coord_maps[i].compose(layer->coord_map());
-    }
-  }
+//   std::stringstream buffer;
+//   for (int i = 0; i < 2; ++i) {
+//     buffer << "i = " << i << std::endl;
+//     for (Blob<Dtype>* blob = bottom[i]; blob != inter_blob;
+//          blob = this->net_->bottom_vecs()[down_map[blob]][0]) {
+//       shared_ptr<Layer<Dtype> > layer = this->net_->layers()[down_map[blob]];
+//       coord_maps[i] = coord_maps[i].compose(layer->coord_map());
+//       
+//       buffer << layer->layer_param().name() << ": ";
+//       buffer << layer->coord_map().coefs()[0].first << ", " << layer->coord_map().coefs()[0].second << std::endl;
+//     }
+//   }
+//   LOG(ERROR) << buffer.str();
   // Compute the mapping from first bottom coordinates to second.
   DiagonalAffineMap<Dtype> crop_map =
       coord_maps[1].compose(coord_maps[0].inv());
@@ -84,6 +90,10 @@ void CropLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
 template <typename Dtype>
 void CropLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     const vector<Blob<Dtype>*>& top) {
+  
+  this->LayerSetUp(bottom, top);
+  this->Reshape(bottom, top);
+  
   const Dtype* bottom_data = bottom[0]->cpu_data();
   Dtype* top_data = top[0]->mutable_cpu_data();
   for (int n = 0; n < top[0]->num(); ++n) {

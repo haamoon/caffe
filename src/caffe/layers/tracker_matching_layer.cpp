@@ -60,13 +60,20 @@ void TrackerMatchingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom
   for(int n = 0; n < N_; ++n) {
     for(int track = 0; track < max_ntrack_; ++track) {
       max_index = 0;
+      Dtype row_l1 = 0;
       for(int seg = 1; seg < seg_num[n]; ++seg) {
+        row_l1 += std::abs(v_data[seg]);
         if(v_data[max_index] < v_data[seg]) {
           max_index = seg;
         }
       }
       //LOG(ERROR) << "N = " << n << " track = " << track << " max index = " << max_index;
-      caffe_copy(max_nseg_, overlaps_data + max_index * max_nseg_, top_data);
+      
+      if(row_l1 == 0) {
+        caffe_set(max_nseg_, Dtype(0.0), top_data);
+      } else {
+        caffe_copy(max_nseg_, overlaps_data + max_index * max_nseg_, top_data);
+      }
       v_data += max_nseg_;
       top_data += max_nseg_;
     }

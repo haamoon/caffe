@@ -19,7 +19,7 @@ class MatInvLayerTest : public MultiDeviceTest<TypeParam> {
 
  protected:
   MatInvLayerTest()
-      : blob_bottom_a_(new Blob<Dtype>()),
+      : blob_bottom_a_(new Blob<Dtype>()), blob_bottom_coef_(new Blob<Dtype>()),
         blob_top_(new Blob<Dtype>()) {
     
     // fill the values
@@ -29,12 +29,17 @@ class MatInvLayerTest : public MultiDeviceTest<TypeParam> {
     UniformFiller<Dtype> filler(filler_param);
     
     blob_bottom_shape_.push_back(2);
+    blob_bottom_shape_.push_back(2);
     blob_bottom_shape_.push_back(3);
     blob_bottom_shape_.push_back(3);
-    
     blob_bottom_a_->Reshape(blob_bottom_shape_);
-    
     filler.Fill(this->blob_bottom_a_);
+    
+    blob_bottom_coef_shape_.push_back(2);
+    blob_bottom_coef_shape_.push_back(2);
+    blob_bottom_coef_->Reshape(blob_bottom_coef_shape_);
+    filler.Fill(this->blob_bottom_coef_);
+    
     blob_bottom_vec_.push_back(blob_bottom_a_);
     blob_top_vec_.push_back(blob_top_);
   }
@@ -42,54 +47,86 @@ class MatInvLayerTest : public MultiDeviceTest<TypeParam> {
     delete blob_bottom_a_;
     delete blob_top_;
   }
+  
+  template <typename Dtype>
+  void printMat(std::stringstream& buffer, Dtype* mat, int col, int count) {
+    buffer << std::fixed << std::setprecision(5);
+    for (int i = 0; i < count; ++i) {
+      if(i != 0 && i % col == 0) {
+        buffer << ';' << endl;
+      }
+      buffer << std::setw(10) << mat[i] << ' ';
+    }
+    buffer << endl;
+  }
+  
+  
   Blob<Dtype>* const blob_bottom_a_;
+  Blob<Dtype>* const blob_bottom_coef_;
   Blob<Dtype>* const blob_top_;
   vector<Blob<Dtype>*> blob_bottom_vec_;
   vector<Blob<Dtype>*> blob_top_vec_;
   vector<int> blob_bottom_shape_;
+  vector<int> blob_bottom_coef_shape_;
 };
 
 TYPED_TEST_CASE(MatInvLayerTest, TestDtypesAndDevices);
 
 TYPED_TEST(MatInvLayerTest, TestSetUp) {
   typedef typename TypeParam::Dtype Dtype;
+  bool use_coef_array = false;
   LayerParameter layer_param;
   MatInvParameter* matinv_param = layer_param.mutable_matinv_param();
   matinv_param->set_lambda(.1);
   shared_ptr<MatInvLayer<Dtype> > layer(
       new MatInvLayer<Dtype>(layer_param));
-      
+  
+  if(use_coef_array) {
+    this->blob_bottom_vec_.push_back(this->blob_bottom_coef_);
+  }
+  
   layer->SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
   EXPECT_EQ(this->blob_top_->shape(0), 2);
-  EXPECT_EQ(this->blob_top_->shape(1), 3);
+  EXPECT_EQ(this->blob_top_->shape(1), 2);
   EXPECT_EQ(this->blob_top_->shape(2), 3);
+  EXPECT_EQ(this->blob_top_->shape(3), 3);
 }
 
 TYPED_TEST(MatInvLayerTest, TestInverse) {
   typedef typename TypeParam::Dtype Dtype;
+  bool use_coef_array = false;
+  
   LayerParameter layer_param;
   MatInvParameter* matinv_param = layer_param.mutable_matinv_param();
   matinv_param->set_lambda(1.0);
   MatInvLayer<Dtype> layer(layer_param);
+  
+  if(use_coef_array) {
+    this->blob_bottom_vec_.push_back(this->blob_bottom_coef_);
+  }
   
   layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
   layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
   
   const Dtype* data = this->blob_top_->cpu_data();
   const Dtype* in_data_a = this->blob_bottom_a_->cpu_data();
+  const Dtype* coef_data = this->blob_bottom_coef_->cpu_data();
   
-  for (int n = 0; n < 2; ++n) {
-    LOG(ERROR) << "Matrix number " << n;
-    for (int i = 0; i < 3; ++i) { 
-    	LOG(ERROR) << '[' << *(in_data_a + n * 9 + i * 3) << ' '
-    					 << *(in_data_a + n * 9 + i * 3 + 1)  << ' '
-    					 << *(in_data_a + n * 9 + i * 3 + 2) << "] ["
-    					 << *(data + n * 9 + i * 3) << ' '
-    					 << *(data + n * 9 + i * 3 + 1) << ' '
-    					 << *(data + n * 9 + i * 3 + 2) << ']';
-    				 
-  	}
+  
+  
+  std::stringstream buffer;
+  for (int n = 0; n < 4; ++n) {
+    if(use_coef_array) {
+      buffer << "Coef for matrix " << n << " = " << coef_data[n] << std::endl;
+    } else {
+      buffer << "Matrix number " << n << std::endl;
+    }
+    this->printMat(buffer, in_data_a + 9 * n, 3, 9);
+    buffer << "Inverse: " << std::endl;
+    this->printMat(buffer, data + 9 * n, 3, 9);
   }
+  
+  LOG(ERROR) << buffer.str();
 }
 
 TYPED_TEST(MatInvLayerTest, TestInverseGradient) {
@@ -98,7 +135,12 @@ TYPED_TEST(MatInvLayerTest, TestInverseGradient) {
   MatInvParameter* matinv_param = layer_param.mutable_matinv_param();
   matinv_param->set_lambda(1.0);
   MatInvLayer<Dtype> layer(layer_param);
-      
+  bool use_coef_array = false;
+  
+  if(use_coef_array) {
+    this->blob_bottom_vec_.push_back(this->blob_bottom_coef_);
+  }
+  
   GradientChecker<Dtype> checker(1e-2, 1e-2);
   checker.CheckGradient(&layer, this->blob_bottom_vec_,
       this->blob_top_vec_);

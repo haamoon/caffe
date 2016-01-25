@@ -1,68 +1,46 @@
-#include <algorithm>
 #include <vector>
 
 #include "caffe/layer.hpp"
-#include "caffe/vision_layers.hpp"
 #include "caffe/tracking_layers.hpp"
 
 namespace caffe {
 
-template <typename Dtype>
-__global__ void SwitchLayerForward(const int nthreads,
-    const Dtype* const bottom_data, const Dtype* switch_data,
-    Dtype* const top_data, int input_offset, int lda) {
-  CUDA_KERNEL_LOOP(index, nthreads) {
-    int switch_index = index / input_offset;
-    
-    if(switch_data[switch_index] == 1) {
-    	top_data[index] = bottom_data[index];
-  	} else {
-  		int mat_index = index % input_offset;
-  		if(mat_index % (lda + 1) != 0) {
-  			top_data[index] = 0;
-  		} else {
-  			top_data[index] = 1;
-  		}
-  	}
-  }
-}
 
 template <typename Dtype>
-__global__ void SwitchLayerBackward(const int nthreads,
-    const Dtype* const top_diff, const Dtype* switch_data,
-    Dtype* const bottom_diff, int input_offset) {
-  CUDA_KERNEL_LOOP(index, nthreads) {
-    int switch_index = index / input_offset;
-    bottom_diff[index] = (switch_data[switch_index] == 1) ? top_diff[index] : 0;
-  }
-}
-
-template <typename Dtype>
-void SwitchLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
-    const vector<Blob<Dtype>*>& top) {
-  
-  const Dtype* input_data = bottom[0]->gpu_data();
-  const Dtype* switch_data = bottom[1]->gpu_data();
+void SwitchLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
+  const int selector_ind = bottom.size() - 1;
   Dtype* top_data = top[0]->mutable_gpu_data();
-  int count = top[0]->count();
-  SwitchLayerForward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
-        count, input_data, switch_data, top_data, input_offset_, D_2_);
+  const Dtype* select_data = bottom[selector_ind]->cpu_data();
+  
+  for (int n = 0; n < selector_dim_; n++) {
+    int index = static_cast<int>(select_data[n]);
+    DCHECK(floor(index) == index) << "Index should be an integer";
+    DCHECK_GE(index, 0) << "Index should be greater than 0";
+    DCHECK_LT(index, selector_ind) << "Index should be less than " << selector_ind;
+    const Dtype* bottom_data = bottom[index]->gpu_data();
+    caffe_copy(inner_dim_, bottom_data + n * inner_dim_,
+               top_data + n * inner_dim_);
+  }
 }
 
 template <typename Dtype>
 void SwitchLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
-    const vector<bool>& propagate_down,
-    const vector<Blob<Dtype>*>& bottom) {
-  //CHECK(!propagate_down[1]) << "Can not propagate to the switch gate!";
-    
-	const Dtype* switch_data = bottom[1]->gpu_data();
-	const Dtype* top_diff = top[0]->gpu_diff();
-	Dtype* bottom_diff = bottom[0]->mutable_gpu_diff();
-	int count = top[0]->count();
-	
-	SwitchLayerBackward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
-        count, top_diff, switch_data, bottom_diff, input_offset_);
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
+  
+  const int selector_ind = bottom.size() - 1;
+  const Dtype* top_diff = top[0]->gpu_diff();
+  const Dtype* select_data = bottom[selector_ind]->cpu_data();
+  
+  //CHECK(!propagate_down[selector_ind]) << " Switch layer cannot backpropagate to selector inputs.";
+  
+  for (int n = 0; n < selector_dim_; n++) {
+    int index = static_cast<int>(select_data[n]);
+    Dtype* bottom_diff = bottom[index]->mutable_gpu_diff();
+    caffe_copy(inner_dim_, top_diff+ n * inner_dim_,
+               bottom_diff + n * inner_dim_);
+  }
 }
 
 INSTANTIATE_LAYER_GPU_FUNCS(SwitchLayer);
+
 }  // namespace caffe

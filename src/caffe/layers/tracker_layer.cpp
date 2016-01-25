@@ -16,14 +16,11 @@ namespace caffe {
   //const vector<string> debug_probs(debug_probs_arr, debug_probs_arr+(sizeof(debug_probs_arr)/sizeof(debug_probs_arr[0])));
   //
   
-  template <typename Dtype>
-  inline int TrackerLayer<Dtype>::ExactNumTopBlobs() const {
-    return 2
-    // Debug: Prob some of the outputs
-    //+ debug_probs.size()
-    //
-    ; 
-  }
+  // Debug: Prob some of the outputs
+  //template <typename Dtype>
+  //inline int TrackerLayer<Dtype>::ExactNumTopBlobs() const {
+  //  return 2 + debug_probs.size(); 
+  //}
   
   template <typename Dtype>
   void TrackerLayer<Dtype>::RecurrentInputBlobNames(vector<string>* names) const {
@@ -69,8 +66,6 @@ namespace caffe {
     names->resize(2);
     (*names)[0] = "v";
     (*names)[1] = "vtilde";
-    
-    
     // Debug: Prob some of the outputs
     //names->resize(2 + debug_probs.size());
     //for(int i = 0; i < debug_probs.size(); i++) {
@@ -89,6 +84,7 @@ namespace caffe {
   
   template <typename Dtype>
   void TrackerLayer<Dtype>::FillUnrolledNet(NetParameter* net_param) const {
+    const int num_track = this->layer_param_.tracker_param().num_track();
     
     // Add generic LayerParameter's (without bottoms/tops) of layer types we'll
     // use to save redundant code.
@@ -105,20 +101,22 @@ namespace caffe {
     slice_param.set_type("Slice");
     slice_param.mutable_slice_param()->set_axis(0);
     
-  		LayerParameter scalar_param;
-  		scalar_param.set_type("Scalar");
-  		scalar_param.mutable_scalar_param()->set_axis(0);
+    LayerParameter scalar_param;
+    scalar_param.set_type("Scalar");
+    scalar_param.mutable_scalar_param()->set_axis(0);
     
     
     //TODO: currently feature_dim_ can not be set because this
     //fucntion is defined as constant. So, I set it mannually
     //in RecurrentInputShapes proto.
     //initialize feature_dim_ before calling RecurrentInputShapes
-    //x input is a T_ x N_ x (num_seg x feature_dim_) array
+    //x input is a T_ x N_ x num_seg x feature_dim_ array
     CHECK_GE(net_param->input_size(), 1);
     CHECK_EQ(net_param->input(0).compare("x"), 0);
     const BlobShape input_blob_shape = net_param->input_shape(0);
     
+    //Check num_seg >= num_track
+    CHECK_GE(input_blob_shape.dim(2), num_track) << "Number of segments " << input_blob_shape.dim(2) << " should be greater than or equal to the number of track " << num_track;
     
     vector<BlobShape> input_shapes;
     RecurrentInputShapes(&input_shapes);
@@ -206,6 +204,7 @@ namespace caffe {
         v_split_param->add_top("cont1_" + ts);
         v_split_param->add_top("cont2_" + ts);
         v_split_param->add_top("cont3_" + ts);
+        v_split_param->add_top("cont4_" + ts);
       }
       
       // Add layers to split h_{t-1} to h1_{t-1} h2_{t-1}
@@ -228,8 +227,7 @@ namespace caffe {
         c_split_param->add_top("c1_" + tm1s);
         c_split_param->add_top("c2_" + tm1s);
       }
-      
-      
+            
       // Add layers to compute
       //     hm1_{t-1} := (h_{t-1} + \lambda I)^{-1}
       {
@@ -265,13 +263,39 @@ namespace caffe {
       }
       
       // Add layers to compute
-      //     v_cont_{t} = v'_{t} * cont{t}
+      //     v_cont_{t} = v'_{t} * cont{t} + slice(overlaps_{t} * (1 - cont{t}))
       {
+        //If the second output is empty slice layer will fail
+        if(input_blob_shape.dim(2) - num_track > 0) {
+          LayerParameter* s_overlaps_param = net_param->add_layer();
+          s_overlaps_param->set_type("Slice");
+          s_overlaps_param->set_name("slice_overlaps_" + ts);
+          s_overlaps_param->mutable_slice_param()->set_axis(2);
+          s_overlaps_param->mutable_slice_param()->add_slice_point(num_track);
+          s_overlaps_param->add_bottom("overlaps1_" + ts);
+          s_overlaps_param->add_top("s_overlaps_" + ts);
+          s_overlaps_param->add_top("tmp_" + ts);
+          
+          LayerParameter* silent_tmp_param = net_param->add_layer();
+          silent_tmp_param->set_type("Silence");
+          silent_tmp_param->set_name("silent_tmp_" + ts);
+          silent_tmp_param->add_bottom("tmp_" + ts);
+        }
+        //slice is not necessary
+        else {
+          LayerParameter* s_overlaps_param = net_param->add_layer();
+          s_overlaps_param->set_type("Split");
+          s_overlaps_param->set_name("rename_overlaps_" + ts);
+          s_overlaps_param->add_bottom("overlaps1_" + ts);
+          s_overlaps_param->add_top("s_overlaps_" + ts);
+        }
+        
         LayerParameter* v_cont_param = net_param->add_layer();
-        v_cont_param->set_type("Select");
+        v_cont_param->set_type("Switch");
         v_cont_param->set_name("v_cont_" + ts);
+        v_cont_param->mutable_switch_param()->set_axis(2);
+        v_cont_param->add_bottom("s_overlaps_" + ts);
         v_cont_param->add_bottom("v_" + ts);
-        v_cont_param->add_bottom("overlaps1_" + ts);
         v_cont_param->add_bottom("cont1_" + ts);
         v_cont_param->add_top("v_cont_" + ts);
       }
@@ -279,7 +303,7 @@ namespace caffe {
       
       // Add layers to copy v_cont_{t} 3 times
       //     v1_{t}, v2_{t}, v3_{t}, v4_{t}
-      {
+      //{
         LayerParameter* v_split_param = net_param->add_layer();
         v_split_param->set_type("Split");
         v_split_param->set_name("v_split_" + ts);
@@ -287,17 +311,38 @@ namespace caffe {
         // for computing m_{t}
         v_split_param->add_top("v1_" + ts);
         // for computing C_{t}
-        v_split_param->add_top("v2_" + ts);
+        //v_split_param->add_top("v2_" + ts);
         // for computing output V
         v_split_param->add_top("v3_" + ts);
         // for computing vtilde
         v_split_param->add_top("v4_" + ts);
-      }
+      //}
       
       // Add layers to calculate v_tilde_{t}
       {
         if(this->layer_param_.tracker_param().use_softmax()) {
-          NOT_IMPLEMENTED;
+          //TODO: handle the case where some of the tracks are not matched (zero row in v)
+          //NOT_IMPLEMENTED;
+          LayerParameter* v_scale_param = net_param->add_layer();
+          v_scale_param->set_type("Power");
+          v_scale_param->set_name("v_scale_" + ts);
+          v_scale_param->mutable_power_param()->set_scale(this->layer_param_.tracker_param().softmax_scale());
+          v_scale_param->add_bottom("v4_" + ts);
+          v_scale_param->add_top("scaled_v_" + ts);
+          
+          LayerParameter* v_softmax_param = net_param->add_layer();
+          v_softmax_param->set_type("Softmax");
+          v_softmax_param->set_name("v_softmax_" + ts);
+          v_softmax_param->mutable_softmax_param()->set_axis(3);
+          v_softmax_param->add_bottom("scaled_v_" + ts);
+          v_softmax_param->add_top("softmax_v_" + ts);
+          
+          LayerParameter* v_tilde_param = net_param->add_layer();
+          v_tilde_param->set_type("MatMult");
+          v_tilde_param->set_name("vtilde_" + ts);
+          v_tilde_param->add_bottom("softmax_v_" + ts);
+          v_tilde_param->add_bottom("overlaps2_" + ts);
+          v_tilde_param->add_top("vtilde_" + ts);
         } else {
           LayerParameter* v_tilde_param = net_param->add_layer();
           v_tilde_param->set_type("TrackerMatching");
@@ -309,6 +354,20 @@ namespace caffe {
           v_tilde_param->add_top("vtilde_" + ts);
         }
       }
+      
+      // Add layers to copy vtilde_{t} 2 times
+      //     vtilde1_{t}, vtilde2_{t}
+      //{
+        LayerParameter* vtilde_split_param = net_param->add_layer();
+        vtilde_split_param->set_type("Split");
+        vtilde_split_param->set_name("vtilde_split_" + ts);
+        vtilde_split_param->add_bottom("vtilde_" + ts);
+      
+        // for computing output_
+        vtilde_split_param->add_top("vtilde1_" + ts);
+        // for computing C_{t}
+        //vtilde_split_param->add_top("vtilde1_" + ts);
+      //}
       
       // Add layers to comput
       // 	m_{t} = \phi_1(v1_{t}) where \phi_1 is
@@ -322,7 +381,6 @@ namespace caffe {
         r1_param->add_top("vr_" + ts);
         BlobShape* r1_top_blob_shape = r1_param->mutable_reshape_param()->mutable_shape();
         //x input is a T_ x N_ x num_seg x feature_dim_ array
-        const int num_track = this->layer_param_.tracker_param().num_track();
         r1_top_blob_shape->add_dim(input_blob_shape.dim(1));
         r1_top_blob_shape->add_dim(1);
         r1_top_blob_shape->add_dim(num_track);
@@ -351,15 +409,18 @@ namespace caffe {
         r2_top_blob_shape->add_dim(input_blob_shape.dim(2));
       }
       
-      // Add layers to split m_{t} to m1_{t}
+      
+      // Add layers to split m_{t} to m1_{t}, and m2_{t}
       {
         LayerParameter* m_split_param = net_param->add_layer();
         m_split_param->set_type("Split");
         m_split_param->set_name("m_split_" + ts);
         m_split_param->add_bottom("m_" + ts);
         m_split_param->add_top("m1_" + ts);
+        m_split_param->add_top("m2_" + ts);
       }
       
+    
       // Add layers to comput
       // 	H_{t} =  cont{t} * H_{t-1} + X_{t}^\top (M_{t} X_{t})
       {
@@ -417,7 +478,13 @@ namespace caffe {
         LayerParameter* vmx_param = net_param->add_layer();
         vmx_param->CopyFrom(matmult_param);
         vmx_param->set_name("vmx_" + ts);
-        vmx_param->add_bottom("v2_" + ts);
+        if(this->layer_param_.tracker_param().use_vtilde_in_c()) {
+          vtilde_split_param->add_top("vtilde2_" + ts);
+          vmx_param->add_bottom("vtilde2_" + ts);
+        } else {
+          v_split_param->add_top("v2_" + ts);
+          vmx_param->add_bottom("v2_" + ts);
+        }
         vmx_param->add_bottom("mx2_" + ts);
         vmx_param->add_top("vmx_" + ts);
         
@@ -437,7 +504,7 @@ namespace caffe {
         update_c_param->add_bottom("vmx_" + ts);
         update_c_param->add_top("c_" + ts);
       }
-      vtilde_concat_layer.add_bottom("vtilde_" + ts);
+      vtilde_concat_layer.add_bottom("vtilde1_" + ts);
       output_concat_layer.add_bottom("v3_" + ts);
     }  // for (int t = 1; t <= this->T_; ++t)
     

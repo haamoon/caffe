@@ -112,7 +112,7 @@ void MatMultLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       caffe_cpu_gemm<Dtype>(A_transpose_, B_transpose_, D_1_,
 	D_3_, D_2_,
 	(Dtype)1., A_data + A_offset_ * n, B_data + B_offset_ * n,
-	(Dtype)0., C_data + C_offset_ * n);		
+	(Dtype)0., C_data + C_offset_ * n);
     }
   }
   else if(A_is_diag_ && !B_is_diag_) {

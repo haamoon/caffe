@@ -1,91 +1,85 @@
-#include <algorithm>
 #include <vector>
 
-#include "caffe/layer.hpp"
-#include "caffe/vision_layers.hpp"
 #include "caffe/tracking_layers.hpp"
 
 namespace caffe {
+
+template <typename Dtype>
+void SwitchLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top) {
   
-  template <typename Dtype>
-  void SwitchLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
-                                   const vector<Blob<Dtype>*>& top) {
-    
-    vector<int> input_shape = bottom[0]->shape();
-    vector<int> switch_shape = bottom[1]->shape();
-    
-    CHECK_GE(input_shape.size(), 2);
-    int input_start_axis = input_shape.size() - 2;
-    
-    D_1_ = input_shape[input_start_axis];
-    D_2_ = input_shape[input_start_axis + 1];
-    input_offset_ = D_1_ * D_2_;
-    
-    N_ = bottom[0]->count(0, input_start_axis);
-    CHECK_EQ(N_, bottom[1]->count());
-    
-    
-    //Reshaping top
-    top[0]->ReshapeLike(*bottom[0]);
+  axis_ = bottom[0]->CanonicalAxisIndex(this->layer_param_.switch_param().axis());
+  
+  vector<int> top_shape = bottom[0]->shape();
+  
+  // Check that the dimensions of bottoms are all the same
+  for (int i = 1; i < bottom.size() - 1; ++i) {
+    vector<int> shape_i = bottom[i]->shape();
+    CHECK(shape_i == top_shape);
   }
   
-  template <typename Dtype>
-  void SwitchLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
-                                       const vector<Blob<Dtype>*>& top) {
-    
-    const Dtype* input_data = bottom[0]->cpu_data();
-    const Dtype* switch_data = bottom[1]->cpu_data();
-    Dtype* top_data = top[0]->mutable_cpu_data();
-    
-    
-    for (int n = 0; n < N_; ++n) {
-      switch((int)switch_data[n]) {
-          //set output to the predifined value
-        case 0:
-          caffe_set(input_offset_, (Dtype).0, top_data + n * input_offset_);
-          caffe_strided_add_scalar<Dtype>(input_offset_, (Dtype)1.0, D_2_ + 1, top_data + input_offset_ * n);
-          break;
-          //forward bottom[0]
-        case 1:
-          caffe_copy(input_offset_, input_data + input_offset_ * n, top_data + input_offset_ * n);
-          break;
-        default:
-          LOG(FATAL) << "switch_data can be whether 0 or 1";
-      }
-    }
+  // Check the selector dimensions
+  // It could be generalized to have more channels, one per top
+  const int selector_ind = bottom.size() - 1;
+  
+  CHECK_EQ(axis_, bottom[selector_ind]->num_axes())
+  << "selector axis should be equal to the staring axis " << axis_;
+  
+  for (int i = 0; i < bottom[selector_ind]->num_axes(); ++i) {
+    CHECK_EQ(bottom[0]->shape(i), bottom[selector_ind]->shape(i))
+    << "dimension mismatch between bottom[0]->shape(" << i
+    << ") and bottom["<< selector_ind << "]->shape(" << i << ")";
   }
+  outer_dim_ = bottom[0]->count(0, axis_);
+  selector_dim_ = bottom[selector_ind]->count();
+  inner_dim_ = bottom[0]->count(axis_);
+}
+
+template <typename Dtype>
+void SwitchLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top) {
+  // Initialize with the first blob.
+  top[0]->ReshapeLike(*bottom[0]);
+}
+
+template <typename Dtype>
+void SwitchLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top) {
+  const int selector_ind = bottom.size() - 1;
+  Dtype* top_data = top[0]->mutable_cpu_data();
+  const Dtype* select_data = bottom[selector_ind]->cpu_data();
   
-  template <typename Dtype>
-  void SwitchLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
-                                        const vector<bool>& propagate_down,
-                                        const vector<Blob<Dtype>*>& bottom) {
-    //CHECK(!propagate_down[1]) << "Can not propagate to switch gate!";
-    
-    const Dtype* switch_data = bottom[1]->cpu_data();
-    const Dtype* top_diff = top[0]->cpu_diff();
-    Dtype* bottom_diff = bottom[0]->mutable_cpu_diff();
-    
-    for (int n = 0; n < N_; ++n) {
-      switch((int)switch_data[n]) {
-          //set output to the predifined value
-        case 0:
-          caffe_set(input_offset_, (Dtype).0, bottom_diff + n * input_offset_);
-          break;
-          //forward bottom[0]
-        case 1:
-          caffe_copy(input_offset_, top_diff + input_offset_ * n, bottom_diff + input_offset_ * n);
-          break;
-        default:
-          LOG(FATAL) << "switch_data can be whether 0 or 1";
-      }
-    }
+  for (int n = 0; n < selector_dim_; n++) {
+    int index = static_cast<int>(select_data[n]);
+    DCHECK(floor(index) == index) << "Index should be an integer";
+    DCHECK_GE(index, 0) << "Index should be greater than 0";
+    DCHECK_LT(index, selector_ind) << "Index should be less than " << selector_ind;
+    const Dtype* bottom_data = bottom[index]->cpu_data();
+    caffe_copy(inner_dim_, bottom_data + n * inner_dim_,
+               top_data + n * inner_dim_);
   }
-  
-  
+}
+
+template <typename Dtype>
+void SwitchLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
+  const int selector_ind = bottom.size() - 1;
+  const Dtype* top_diff = top[0]->cpu_diff();
+  const Dtype* select_data = bottom[selector_ind]->cpu_data();
+  //CHECK(!propagate_down[selector_ind]) << "Switch layer cannot backpropagate to selector inputs.";
+
+  for (int n = 0; n < selector_dim_; n++) {
+    int index = static_cast<int>(select_data[n]);
+    Dtype* bottom_diff = bottom[index]->mutable_cpu_diff();
+    caffe_copy(inner_dim_, top_diff+ n * inner_dim_,
+               bottom_diff + n * inner_dim_);
+  }
+}
+
 #ifdef CPU_ONLY
-  STUB_GPU(SwitchLayer);
+STUB_GPU(SwitchLayer);
 #endif
-  
-  INSTANTIATE_CLASS(SwitchLayer);
-  REGISTER_LAYER_CLASS(Switch);
+
+INSTANTIATE_CLASS(SwitchLayer);
+REGISTER_LAYER_CLASS(Switch);
 }  // namespace caffe

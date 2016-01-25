@@ -306,7 +306,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 145 (last added: masked_pooling_param)
+// LayerParameter next available layer-specific ID: 148 (last added: switch_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -368,6 +368,7 @@ message LayerParameter {
   optional HDF5DataParameter hdf5_data_param = 112;
   optional HDF5OutputParameter hdf5_output_param = 113;
   optional HingeLossParameter hinge_loss_param = 114;
+  optional HotMultParameter hotmult_param = 145;
   optional ImageDataParameter image_data_param = 115;
   optional InfogainLossParameter infogain_loss_param = 116;
   optional InnerProductParameter inner_product_param = 117;
@@ -391,9 +392,11 @@ message LayerParameter {
   optional SoftmaxParameter softmax_param = 125;
   optional SPPParameter spp_param = 132;
   optional SliceParameter slice_param = 126;
+  optional SwitchParameter switch_param = 147;
   optional TanHParameter tanh_param = 127;
   optional ThresholdParameter threshold_param = 128;
   optional TileParameter tile_param = 138;
+  optional TrackerLossParameter tracker_loss_param = 146;
   optional TrackerParameter tracker_param = 143;
   optional WindowDataParameter window_data_param = 129;
 }
@@ -666,6 +669,10 @@ message HingeLossParameter {
   }
   // Specify the Norm to use L1 or L2
   optional Norm norm = 1 [default = L1];
+}
+
+message HotMultParameter {
+  optional string mode = 1 [default = "ROW"];
 }
 
 message ImageDataParameter {
@@ -987,6 +994,13 @@ message SliceParameter {
   optional uint32 slice_dim = 1 [default = 1];
 }
 
+message SwitchParameter {
+  // The first axis of bottom[0] to apply select (last bottom).  May be negative to index from the end
+  // (e.g., -1 for the last axis).
+  //
+  optional int32 axis = 1 [default = 0];
+}
+
 // Message that stores parameters used by SoftmaxLayer, SoftmaxWithLossLayer
 message SoftmaxParameter {
   enum Engine {
@@ -1012,6 +1026,12 @@ message TanHParameter {
 }
 
 
+// Message that stores parameters used by TrackerLossLayer
+message TrackerLossParameter {
+  // maximum number of object in the ground truth
+  optional int32 object_num = 1 [default = 1];
+}
+
 // Message that stores parameters used by TrackerLayer
 message TrackerParameter {
   // Number of tracks in the video.
@@ -1029,6 +1049,8 @@ message TrackerParameter {
   
   // Use vtilde to update C_t, use_softmax should be true(?)
   optional bool use_vtilde_in_c = 5 [default = false];
+  
+  optional float softmax_scale = 6 [default = 1.0];
 }
 
 
