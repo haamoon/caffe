@@ -1,8 +1,8 @@
-net: "./tracker_model/Deconv_AlexNet/train_val.prototxt"
+net: "./tracker_model/Deconv_AlexNet/train_val_frame0.prototxt"
 test_iter: 79
 test_interval: 2000
 display: 20
-average_loss: 153
+average_loss: 303
 lr_policy: "fixed"
 # lr for unnormalized softmax -- see train_val definition
 base_lr: 1e-10
@@ -13,6 +13,7 @@ iter_size: 1
 max_iter: 80000
 weight_decay: 0.0005
 snapshot: 2000
-snapshot_prefix: "./tracker_model/Deconv_AlexNet/snapshots/t2__iter_"
+snapshot_prefix: "./tracker_model/Deconv_AlexNet/snapshots/t0_"
 test_initialization: true
 solver_mode: GPU
+

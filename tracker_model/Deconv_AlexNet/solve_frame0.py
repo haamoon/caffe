@@ -7,15 +7,16 @@ import numpy as np
 sys.path.insert(0, caffe_root + 'python')
 import caffe
 
+
 # base net -- the learned coarser model
-base_weights = 'fcn-alexnet-pascal.caffemodel'
-#base_weights = './snapshots/train_iter_20000.caffemodel'
+#base_weights = 'fcn-alexnet-pascal.caffemodel'
+base_weights = './snapshots/train_t0__iter_6000.caffemodel'
 
 # init
 caffe.set_mode_gpu()
 caffe.set_device(0)
 
-solver = caffe.SGDSolver('solver.prototxt')
+solver = caffe.SGDSolver('solver_frame0.prototxt')
 
 # do net surgery to set the deconvolution weights for bilinear interpolation
 #interp_layers = [k for k in solver.net.params.keys() if 'deconv' in k]

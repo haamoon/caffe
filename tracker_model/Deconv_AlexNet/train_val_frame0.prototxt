@@ -13,7 +13,7 @@ layer {
     mean_value: 122.67892
   }
   image_data_param {
-    source: "./tracker_model/data/SegTrackv2_hdf5_t2/images.txt"
+    source: "./tracker_model/data/SegTrackv2_hdf5_t0/images.txt"
     batch_size: 2
     shuffle: false
   }
@@ -36,7 +36,7 @@ layer {
   top: "gt_overlaps"
   include { phase: TRAIN }
   hdf5_data_param {
-    source: "./tracker_model/data/SegTrackv2_hdf5_t2/seq_data.txt"
+    source: "./tracker_model/data/SegTrackv2_hdf5_t0/seq_data.txt"
     batch_size: 2
   }
 }
@@ -54,6 +54,7 @@ layer {
   bottom: "gt_num"
   include { phase: TRAIN }
 }
+
 
 # test data layers
 layer {
@@ -145,7 +146,7 @@ layer {
   bottom: "conv1"
   top: "pool1"
   pooling_param {
-    pool: AVE
+    pool: MAX
     kernel_size: 3
     stride: 2
   }
@@ -204,7 +205,7 @@ layer {
   bottom: "conv2"
   top: "pool2"
   pooling_param {
-    pool: AVE
+    pool: MAX
     kernel_size: 3
     stride: 2
   }
@@ -498,7 +499,15 @@ layer {
   }
 }
 
-# loss data layer
+layer {
+name: "silent_vtilde"
+type: "Silence"
+bottom: "vtilde"
+include { phase: TRAIN }
+}
+
+# unsupervised loss data layer
+
 layer {
   name: "reshape_v"
   type: "Reshape"
@@ -511,13 +520,14 @@ layer {
     }
     num_axes: 2
   }
+  include { phase: TRAIN }
 }
 
 layer {
-  name: "reshape_vt"
+  name: "reshape_overlaps"
   type: "Reshape"
-  bottom: "vtilde"
-  top: "rvtilde"
+  bottom: "overlaps"
+  top: "roverlaps"
   propagate_down: false
   reshape_param {
     shape {
@@ -525,17 +535,21 @@ layer {
     }
     num_axes: 2
   }
+  include { phase: TRAIN }
 }
 
 layer {
   name: "euclideanLoss"
   type: "EuclideanLoss"
   bottom: "rv"
-  bottom: "rvtilde"
+  bottom: "roverlaps"
   top: "unsupervised_loss"
+  include {phase: TRAIN}
   propagate_down: true
   propagate_down: false
 }
+
+# supervised loss layer
 
 layer {
   name: "trackerLoss"
@@ -549,7 +563,7 @@ layer {
   tracker_loss_param {
     object_num: 6
   }
-}
+}  
 
 layer {
   name: "trackerLoss_refined"
@@ -564,3 +578,4 @@ layer {
     object_num: 6
   }
 }
+
