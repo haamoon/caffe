@@ -429,6 +429,37 @@ layer {
 #  }
 #}
 
+# create conv-feature
+## create conv_feature
+
+layer {
+  name: "deconv-2"
+  type: "Deconvolution"
+  bottom: "conv5" 
+  top: "up-conv5"
+  convolution_param {
+    kernel_size: 31
+    stride: 16
+    num_output: 128
+    group: 128
+    weight_filler: { type: "bilinear" } 
+    bias_term: false
+  }
+  param { 
+  lr_mult: 0 
+  decay_mult: 0 
+  }
+}
+
+layer {
+  name: "crop"
+  type: "Crop"
+  bottom: "up-conv5"
+  bottom: "image"
+  top: "conv5-feature"
+}
+
+
 layer {
   name: "deconv-1"
   type: "Deconvolution"
@@ -437,8 +468,8 @@ layer {
   convolution_param {
     kernel_size: 63 
     stride: 32
-    num_output: 256
-    group: 256
+    num_output: 128
+    group: 128
     weight_filler: { type: "bilinear" } 
     bias_term: false
   }
@@ -453,7 +484,18 @@ layer {
   type: "Crop"
   bottom: "up-fc7"
   bottom: "image"
+  top: "fc7-feature"
+}
+
+layer {
+  name: "concat"
+  type: "Concat"
+  bottom: "fc7-feature"
+  bottom: "conv5-feature"
   top: "conv-feature"
+  concat_param {
+    axis: 1
+  }
 }
 
 # feature pooling data layers

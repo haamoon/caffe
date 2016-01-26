@@ -1,22 +1,27 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
- 
 
-
-
-
-
-
-
-
-
-vtilde_track = np.load('vtilde_track.npy')
-v_track = np.load('v_track.npy')
-gt_track = np.load('gt_track.npy')
 
 i = 3
-lenght = 1000
+lenght = 1000 
+gt_num = 2
+
+v = net.blobs['v'].data
+vtilde = net.blobs['vtilde'].data
+gt_overlaps = net.blobs['gt_overlaps'].data
+
+
+
+
+
+track_ids = np.argmax(gt_overlaps[0], 2)[0, :gt_num]
+
+vtilde_track = vtilde[:, :, track_ids, :]
+v_track = v[:, :, track_ids, :]
+gt_track = gt_overlaps[:, :, :gt_num, :]
+
+
 
 index = np.arange(lenght)
 opacity = 1

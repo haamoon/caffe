@@ -321,12 +321,19 @@ class SuperpixelPoolingLayer : public Layer<Dtype> {
   virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
   private:
-  	int N_;
-  	int channels_;
-  	int image_height_;
-	int image_width_;
-  	int spixel_data_len_;
-  	int spixel_ptr_len_;
+    int N_;
+    int channels_;
+    int image_height_;
+    int image_width_;
+    int input_height_;
+    int input_width_;
+    int spixel_data_len_;
+    int spixel_ptr_len_;
+    
+    int crop_w_offset_;
+    int crop_h_offset_;
+    int crop_w_scale_;
+    int crop_h_scale_;
 };
 
 

@@ -25,6 +25,8 @@ __global__ void copy_kernel(const int n, const int height, const int width,
 template <typename Dtype>
 void CropLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
     const vector<Blob<Dtype>*>& top) {
+  
+  LOG(ERROR) << ">>>>>>>>>>>>> " << crop_h_ << ", " << crop_w_;
   const Dtype* bottom_data = bottom[0]->gpu_data();
   Dtype* top_data = top[0]->mutable_gpu_data();
   const int lines = top[0]->count() / top[0]->width();

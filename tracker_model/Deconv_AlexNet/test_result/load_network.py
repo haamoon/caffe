@@ -10,7 +10,7 @@ import caffe
 
 os.chdir('../../..')
 # base net -- the learned coarser model
-#base_weights = 'fcn-alexnet-pascal.caffemodel'
+#base_weights = './tracker_model/Deconv_AlexNet/fcn-alexnet-pascal.caffemodel'
 base_weights = './tracker_model/Deconv_AlexNet/snapshots/t0__iter_8000.caffemodel'
 prototxt = './tracker_model/Deconv_AlexNet/train_val.prototxt'
 # init

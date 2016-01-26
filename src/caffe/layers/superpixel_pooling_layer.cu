@@ -16,7 +16,7 @@ namespace caffe {
                                            const Dtype* image_data, const Dtype* spixel_data, const Dtype* spixel_ptr,
                                            const Dtype* spixel_num, int image_width, int image_height,
                                            const Dtype* mask_size, int N, int spixel_ptr_len, int spixel_data_len,
-                                           int channels, Dtype* top_data) {
+                                           int channels, int crop_h_offset, int crop_w_offset, int input_height, int input_width, Dtype* top_data) {
     
     //nthreads = N_ * channels_ * spixel_num
     CUDA_KERNEL_LOOP(index, nthreads) {
@@ -38,9 +38,9 @@ namespace caffe {
         Dtype w_ratio = image_width / cur_mask_size[1];
         const Dtype* cur_spixel_data = spixel_data + (n * spixel_data_len + start_ind) * 2;
         for(int i = start_ind; i < end_ind; i++) {
-          int row = (int)(*(cur_spixel_data++) * h_ratio);
-          int col = (int)(*(cur_spixel_data++) * w_ratio);
-          sum += image_data[((n * channels + c ) * image_height + row) * image_width + col];
+          int row = crop_h_offset + (int)(*(cur_spixel_data++) * h_ratio);
+          int col = crop_w_offset + (int)(*(cur_spixel_data++) * w_ratio);
+          sum += image_data[((n * channels + c ) * input_height + row) * input_width + col];
         }
         
         if(end_ind != start_ind) {
@@ -56,7 +56,7 @@ namespace caffe {
                                             const Dtype* top_diff, const Dtype* spixel_data, const Dtype* spixel_ptr,
                                             const Dtype* spixel_num, int image_width, int image_height,
                                             const Dtype* mask_size, int N, int spixel_ptr_len, int spixel_data_len,
-                                            int channels, Dtype* bottom_diff) {
+                                            int channels, int crop_h_offset, int crop_w_offset, int input_height, int input_width,  Dtype* bottom_diff) {
     //nthreads = N_ * channels_
     CUDA_KERNEL_LOOP(index, nthreads) {
       int tmp = index;
@@ -74,10 +74,10 @@ namespace caffe {
         Dtype w_ratio = image_width / cur_mask_size[1];
         const Dtype* cur_spixel_data = spixel_data + (n * spixel_data_len + start_ind) * 2;
         for(int i = start_ind; i < end_ind; i++) {
-          int row = (int)(*(cur_spixel_data++) * h_ratio);
-          int col = (int)(*(cur_spixel_data++) * w_ratio);
-          bottom_diff[((n * channels + c ) * image_height + row) *
-                      image_width + col] +=
+          int row = crop_h_offset + (int)(*(cur_spixel_data++) * h_ratio);
+          int col = crop_w_offset + (int)(*(cur_spixel_data++) * w_ratio);
+          bottom_diff[((n * channels + c ) * input_height + row) *
+                      input_width + col] +=
                       top_diff[(n * (spixel_ptr_len - 1) + spixel) *
                       channels + c] / (end_ind - start_ind);
         }
@@ -133,8 +133,8 @@ namespace caffe {
     
     SuperpixelPoolingForward<Dtype><<<CAFFE_GET_BLOCKS(top_count), CAFFE_CUDA_NUM_THREADS>>>(
                     top_count, image_data, spixel_data, spixel_ptr, spixel_num,
-                    image_width_, image_height_, mask_size, N_,spixel_ptr_len_,
-                    spixel_data_len_, channels_, top_data);
+                    image_width_, image_height_, mask_size, N_, spixel_ptr_len_,
+                    spixel_data_len_, channels_, crop_h_offset_, crop_w_offset_, input_height_, input_width_, top_data);
   }
   
   template <typename Dtype>
@@ -166,7 +166,7 @@ namespace caffe {
       <<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
       count, top_diff, spixel_data, spixel_ptr, spixel_num, image_width_,
       image_height_, mask_size, N_, spixel_ptr_len_, spixel_data_len_,
-      channels_, bottom_diff);
+      channels_, crop_h_offset_, crop_w_offset_, input_height_, input_width_, bottom_diff);
   }
   
   INSTANTIATE_LAYER_GPU_FUNCS(SuperpixelPoolingLayer);

@@ -14,11 +14,6 @@ namespace caffe {
   template <typename Dtype>
   void SuperpixelPoolingLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
                                                  const vector<Blob<Dtype>*>& top) {
-  }
-  
-  template <typename Dtype>
-  void SuperpixelPoolingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
-                                              const vector<Blob<Dtype>*>& top) {
     
     CHECK_GE(bottom[0]->num_axes(), 4) << "Input(1) image must have at least 4 axes, "
     << "corresponding to (..., channels, height, width)";
@@ -31,6 +26,92 @@ namespace caffe {
     CHECK_GE(bottom[4]->num_axes(), 2) << "Input(5) mask_size must have 2 axes, "
     << "corresponding to (..., height = 0/width = 1)";
     
+    
+    if(bottom.size() > 5) {
+      CHECK_GE(bottom[5]->num_axes(), 3) << "Input(1) image must have at least 3 axes, "
+      << "corresponding to (..., height, width)";
+      // Construct a map from top blobs to layer inds, skipping over in-place
+      // connections.
+      map<Blob<Dtype>*, int> down_map;
+      for (int layer_ind = 0; layer_ind < this->net_->top_vecs().size();
+           ++layer_ind) {
+        vector<Blob<Dtype>*> tops = this->net_->top_vecs()[layer_ind];
+        for (int top_ind = 0; top_ind < tops.size(); ++top_ind) {
+          if (down_map.find(tops[top_ind]) == down_map.end()) {
+            down_map[tops[top_ind]] = layer_ind;
+          }
+        }
+      }
+      // Walk back from the first bottom, keeping track of all the blobs we pass.
+      set<Blob<Dtype>*> path_blobs;
+      Blob<Dtype>* blob = bottom[0];
+      int layer_ind;
+      // TODO this logic can be simplified if all blobs are tops
+      path_blobs.insert(blob);
+      while (down_map.find(blob) != down_map.end()) {
+        layer_ind = down_map[blob];
+        if (this->net_->bottom_vecs()[layer_ind].size() == 0) {
+          break;
+        }
+        blob = this->net_->bottom_vecs()[layer_ind][0];
+        path_blobs.insert(blob);
+      }
+      // Now walk back from the fifth bottom, until we find a blob of intersection.
+      Blob<Dtype>* inter_blob = bottom[5];
+      while (path_blobs.find(inter_blob) == path_blobs.end()) {
+        CHECK(down_map.find(inter_blob) != down_map.end())
+        << "Cannot align apparently disconnected blobs.";
+        layer_ind = down_map[inter_blob];
+        CHECK_GT(this->net_->bottom_vecs()[layer_ind].size(), 0)
+        << "Cannot align apparently disconnected blobs.";
+        inter_blob = this->net_->bottom_vecs()[layer_ind][0];
+      }
+      // Compute the coord map from the blob of intersection to each bottom.
+      vector<DiagonalAffineMap<Dtype> > coord_maps(2,
+                                                   DiagonalAffineMap<Dtype>::identity(2));
+      //   std::stringstream buffer;
+         for (int i = 0; i < 2; ++i) {
+           int index = (i == 0) ? 0 : 5;
+      //     buffer << "i = " << i << std::endl;
+           for (Blob<Dtype>* blob = bottom[index]; blob != inter_blob;
+                blob = this->net_->bottom_vecs()[down_map[blob]][0]) {
+             shared_ptr<Layer<Dtype> > layer = this->net_->layers()[down_map[blob]];
+             coord_maps[i] = coord_maps[i].compose(layer->coord_map());
+      
+       //      buffer << layer->layer_param().name() << ": ";
+       //      buffer << layer->coord_map().coefs()[0].first << ", " << layer->coord_map().coefs()[0].second << std::endl;
+           }
+         }
+      //   LOG(ERROR) << buffer.str();
+      // Compute the mapping from first bottom coordinates to second.
+      DiagonalAffineMap<Dtype> crop_map =
+      coord_maps[1].compose(coord_maps[0].inv());
+      for (int i = 0; i < 2; ++i) {
+        // Check for scale mismatch (unfortunately, CHECK_DOUBLE_EQ does not
+        // support a message like the other CHECKs).
+        //CHECK_DOUBLE_EQ(crop_map.coefs()[i].first, 1);
+        CHECK_LE(crop_map.coefs()[i].second, 0) << "Negative crop width.";
+        // Check that the crop width is an integer.
+        CHECK_DOUBLE_EQ(crop_map.coefs()[i].second,
+                        round(crop_map.coefs()[i].second));
+      }
+      
+      crop_h_offset_ = - round(crop_map.coefs()[0].second);
+      crop_w_offset_ = - round(crop_map.coefs()[1].second);
+      crop_h_scale_ = crop_map.coefs()[0].first; 
+      crop_w_scale_ = crop_map.coefs()[1].first;
+    }
+    else {
+      crop_h_offset_ = 0;
+      crop_w_offset_ = 0;
+      crop_h_scale_ = static_cast<Dtype>(1);
+      crop_w_scale_ = static_cast<Dtype>(1);
+    }
+  }
+  
+  template <typename Dtype>
+  void SuperpixelPoolingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
+                                              const vector<Blob<Dtype>*>& top) {
     int input_start_axis = bottom[0]->CanonicalAxisIndex(-3);
     N_ = bottom[0]->count(0, input_start_axis);
     CHECK_EQ(N_, bottom[1]->count(0, bottom[1]->CanonicalAxisIndex(-2)));
@@ -39,8 +120,19 @@ namespace caffe {
     CHECK_EQ(N_, bottom[4]->count(0, bottom[4]->CanonicalAxisIndex(-1)));
     
     channels_ = bottom[0]->shape(input_start_axis);
-    image_height_ = bottom[0]->shape(input_start_axis + 1);
-    image_width_ = bottom[0]->shape(input_start_axis + 2);
+    
+    
+    input_height_ = bottom[0]->shape(input_start_axis + 1);
+    input_width_ = bottom[0]->shape(input_start_axis + 2);
+    
+    Dtype image_height = (crop_h_scale_ * input_height_);
+    Dtype image_width = (crop_w_scale_ * input_width_);
+    
+    CHECK_DOUBLE_EQ(image_height, round(image_height));
+    CHECK_DOUBLE_EQ(image_width, round(image_width));
+    
+    image_height_ = round(image_height);
+    image_width_ = round(image_width);
     
     //bottom[1] has size ... x spixel_data_len_ x 2
     spixel_data_len_ = bottom[1]->shape(bottom[1]->CanonicalAxisIndex(-2));
@@ -81,15 +173,15 @@ namespace caffe {
       for (int c = 0; c < channels_; ++c) {
         //iterate over superpixels
         for(int spixel = 0; spixel < spixel_num[n]; ++spixel) {
-          CHECK_LT(spixel_num[n], spixel_ptr_len_) << "Number of superpixels" <<
-    						" exceeds the maximum lenght of the ptr";
+          CHECK_LT(spixel_num[n], spixel_ptr_len_) << "Number of superpixels" << 
+                  " exceeds the maximum lenght of the ptr";
           int start_ind = spixel_ptr[spixel];
           int end_ind = spixel_ptr[spixel + 1];
 
           for(int i = start_ind; i < end_ind; i++) {
-            int row = (int)(spixel_data[i * 2] * h_ratio);
-            int col = (int)(spixel_data[i * 2 + 1] * w_ratio);
-            top_data[spixel * channels_ + c] += image_data[row * image_width_ + col]/(end_ind - start_ind);
+            int row = crop_h_offset_ + (int)(spixel_data[i * 2] * h_ratio);
+            int col = crop_w_offset_ + (int)(spixel_data[i * 2 + 1] * w_ratio);
+            top_data[spixel * channels_ + c] += image_data[row * input_width_ + col]/(end_ind - start_ind);
           }
         }
         image_data += bottom[0]->count(bottom[0]->CanonicalAxisIndex(-2));
@@ -135,9 +227,9 @@ namespace caffe {
           int end_ind = spixel_ptr[spixel + 1];
           CHECK_GE(end_ind, start_ind);
           for(int i = start_ind; i < end_ind; i++) {
-            int row = (int)(spixel_data[i * 2] * h_ratio);
-            int col = (int)(spixel_data[i * 2 + 1] * w_ratio);
-            bottom_diff[row * image_width_ + col] +=
+            int row = crop_h_offset_ + (int)(spixel_data[i * 2] * h_ratio);
+            int col = crop_w_offset_ + (int)(spixel_data[i * 2 + 1] * w_ratio);
+            bottom_diff[row * input_width_ + col] +=
               top_diff[spixel * channels_ + c]/(end_ind - start_ind);
           }
         }
