@@ -399,6 +399,7 @@ message LayerParameter {
   optional TrackerLossParameter tracker_loss_param = 146;
   optional TrackerParameter tracker_param = 143;
   optional WindowDataParameter window_data_param = 129;
+  optional RecurrentTrackerParameter recurrent_tracker_param = 150;
 }
 
 // Message that stores parameters used to apply transformation
@@ -1053,6 +1054,26 @@ message TrackerParameter {
   optional float softmax_scale = 6 [default = 1.0];
 }
 
+message RecurrentTrackerParameter {
+  // Number of tracks in the video.
+  optional int32 max_ntrack = 1 [default = 1];
+  
+  // Input feature dimension.
+  required int32 feature_dim = 2;
+
+  // Lambda value in the inversion unit
+  optional float lambda = 3 [default = .5];
+  
+  // Use softmax in the refinement layer (default hardmax)
+  optional bool use_softmax = 4 [default = false]; 
+  
+  // Use vtilde to update C_t, use_softmax should be true(?)
+  optional bool use_vtilde_in_c = 5 [default = false];
+  
+  optional float softmax_scale = 6 [default = 1.0];
+
+  required int32 max_nseg = 7;
+}
 
 // Message that stores parameters used by TileLayer
 message TileParameter {
