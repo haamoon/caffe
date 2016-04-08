@@ -420,9 +420,9 @@ template <typename Dtype>
         : RecurrentLayer<Dtype>(param) {}
         
     virtual inline const char* type() const { return "RecurrentTracker"; }
-    virtual inline int MinBottomBlobs() const { return 4; }
-    virtual inline int MaxBottomBlobs() const { return 4; }
-    virtual inline int ExactNumTopBlobs() const { return 2; }
+    virtual inline int MinBottomBlobs() const { return 3; }
+    virtual inline int MaxBottomBlobs() const { return 3; }
+    virtual inline int ExactNumTopBlobs() const { return 1; }
   protected:
     virtual void FillUnrolledNet(NetParameter* net_param) const;
     virtual void RecurrentInputBlobNames(vector<string>* names) const;
