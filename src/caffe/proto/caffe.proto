@@ -401,6 +401,12 @@ message LayerParameter {
   optional ThresholdParameter threshold_param = 128;
   optional TileParameter tile_param = 138;
   optional WindowDataParameter window_data_param = 129;
+  
+  //Tracking layer
+  optional L1LossParameter l1_loss_param = 145;
+  optional TrackerParameter tracker_param = 146;
+  optional SegmentPoolingParameter segment_pooling_param = 147;
+  optional Filter2DParameter filter2d_param = 148;
 }
 
 // Message that stores parameters used to apply transformation
@@ -1371,4 +1377,46 @@ message PReLUParameter {
   optional FillerParameter filler = 1;
   // Whether or not slope paramters are shared across channels.
   optional bool channel_shared = 2 [default = false];
+}
+
+//Tracking Layer messages
+
+// Message that stores parameters used by L1LossLayer
+message L1LossParameter {
+  optional bool l2_per_location = 1 [default = false];
+  optional bool l2_prescale_by_channels = 2 [default = false]; // Old style
+  optional bool normalize_by_num_entries = 3 [default = false]; // if we want to normalize not by batch size, but by the number of non-NaN entries
+  optional float epsilon = 4 [default = 1e-2]; // constant for smoothing near zero
+  optional float plateau = 3001 [default = 0]; // L1 Errors smaller than plateau-value will result in zero loss and no gradient
+}
+
+// Message that stores parameters used by TrackerLayer
+message TrackerParameter {
+  // Number of tracks in the video.
+  optional int32 num_track = 1 [default = 1];
+  
+  // Lambda value in the inversion unit
+  optional float lambda = 2 [default = 1];
+  
+  // Sampling interval of X 
+  optional int32 sample_inter = 3 [default = 1];
+  
+  // Use softmax in the refinement layer (default hardmax)
+  optional bool use_softmax = 4 [default = false]; 
+  
+  // Use vtilde to update C_t, use_softmax should be true(?)
+  optional bool use_vtilde_in_c = 5 [default = false];
+  
+  optional float softmax_scale = 6 [default = 1.0];
+  
+  // Input feature dimension.
+  //optional int32 feature_dim = 2;
+}
+
+message SegmentPoolingParameter {
+  required int32 num_spatial_cells = 1;
+}
+
+message Filter2DParameter {
+        optional string mode = 1 [default = 'set_zero'];
 }

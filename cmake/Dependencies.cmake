@@ -170,3 +170,12 @@ endif()
 if(BUILD_docs)
   find_package(Doxygen)
 endif()
+
+# ---[ Magma
+if(USE_MAGMA)
+    set(MAGMA_LIBRARIES "/usr/local/magma/lib/libmagma.so")
+    set(MAGMA_INCLUDE "/usr/local/magma/include/")
+    include_directories(SYSTEM ${MAGMA_INCLUDE})
+    list(APPEND Caffe_LINKER_LIBS ${MAGMA_LIBRARIES})
+    message(${Caffe_LINKER_LIBS})
+endif()
