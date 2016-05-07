@@ -183,7 +183,7 @@ namespace caffe {
   };
   
   
-  TYPED_TEST_CASE(TrackerLayerTest, CPUDevice<float>);
+  TYPED_TEST_CASE(TrackerLayerTest, TestDtypesAndDevices);
   
   
   TYPED_TEST(TrackerLayerTest, TestSetUp) {

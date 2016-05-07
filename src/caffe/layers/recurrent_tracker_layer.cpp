@@ -74,6 +74,8 @@ namespace caffe {
   template <typename Dtype>
   void RecurrentTrackerLayer<Dtype>::FillUnrolledNet(NetParameter* net_param) const {
     const int max_ntrack = this->layer_param_.recurrent_tracker_param().max_ntrack();
+    const int lambda = this->layer_param_.recurrent_tracker_param().lambda();
+    const int alpha = this->layer_param_.recurrent_tracker_param().alpha();
     
     // Add generic LayerParameter's (without bottoms/tops) of layer types we'll
     // use to save redundant code.
@@ -89,11 +91,10 @@ namespace caffe {
     slice_param.set_type("Slice");
     slice_param.mutable_slice_param()->set_axis(0);
     
-    LayerParameter scalar_param;
-    scalar_param.set_type("Scalar");
-    scalar_param.mutable_scalar_param()->set_axis(0);
-    
-    
+    LayerParameter power_param;
+    power_param.set_type("Power");
+
+
     //TODO: currently feature_dim_ can not be set because this
     //fucntion is defined as constant. So, I set it mannually
     //in RecurrentInputShapes proto.
@@ -102,23 +103,20 @@ namespace caffe {
     CHECK_GE(net_param->input_size(), 1);
     CHECK_EQ(net_param->input(0).compare("X"), 0);
     const BlobShape input_blob_shape = net_param->input_shape(0);
-    
+
     //Check max_nseg >= max_ntrack
     CHECK_GE(input_blob_shape.dim(2), max_ntrack) << "Number of segments " << input_blob_shape.dim(2) << " should be greater than or equal to the number of track " << max_ntrack;
-    
+
     vector<BlobShape> input_shapes;
     RecurrentInputShapes(&input_shapes);
-    CHECK_EQ(2, input_shapes.size());
-    net_param->add_input("X_0");
+    CHECK_EQ(1, input_shapes.size());
+    net_param->add_input("W_0");
     net_param->add_input_shape()->CopyFrom(input_shapes[0]);
-    net_param->add_input("V_0");
-    net_param->add_input_shape()->CopyFrom(input_shapes[1]);
-    
+
     LayerParameter* cont_slice_param = net_param->add_layer();
     cont_slice_param->CopyFrom(slice_param);
     cont_slice_param->set_name("cont_slice");
     cont_slice_param->add_bottom("cont");
-    cont_slice_param->mutable_slice_param()->set_axis(0);
     
     LayerParameter* X_slice_param = net_param->add_layer();
     X_slice_param->CopyFrom(slice_param);
@@ -129,11 +127,6 @@ namespace caffe {
     V_slice_param->CopyFrom(slice_param);
     V_slice_param->set_name("V_slice");
     V_slice_param->add_bottom("V");
-
-    LayerParameter* Y_slice_param = net_param->add_layer();
-    Y_slice_param->CopyFrom(slice_param);
-    Y_slice_param->set_name("Y_slice");
-    Y_slice_param->add_bottom("Y");
 
     LayerParameter Y_concat_layer;
     Y_concat_layer.set_name("Y_concat");
@@ -149,7 +142,6 @@ namespace caffe {
       cont_slice_param->add_top("cont_" + ts);
       X_slice_param->add_top("X_" + ts);
       V_slice_param->add_top("V_" + ts);
-      Y_slice_param->add_top("Y_" + ts);
 
 
 
@@ -158,52 +150,73 @@ namespace caffe {
       LayerParameter* X_split_param = net_param->add_layer();
       X_split_param->set_type("Split");
       X_split_param->set_name("X_split" + ts);
-      X_split_param->add_bottom("X" + ts);
-      X_split_param->add_top("X1" + ts);
-      X_split_param->add_top("X2" + ts);
-      X_split_param->add_top("X3" + ts);
-      X_split_param->add_top("X4" + ts);
+      X_split_param->add_bottom("X_" + ts);
+      X_split_param->add_top("X1_" + ts);
+      X_split_param->add_top("X2_" + ts);
+      X_split_param->add_top("X3_" + ts);
+      X_split_param->add_top("X4_" + ts);
 
       // Add layer to compute
       //     XX_t := X_t X_t^\top
       LayerParameter* XX_param = net_param->add_layer();
       XX_param->CopyFrom(matmult_param);
+      XX_param->set_name("XX_" + ts);
+      XX_param->add_bottom("X1_" + ts);
       XX_param->mutable_matmult_param()->set_transpose_b(true);
-      XX_param->set_name("XX" + ts);
-      XX_param->add_bottom("X1" + ts);
-      XX_param->add_bottom("X2" + ts);
-      XX_param->add_top("XX" + ts);
+      XX_param->add_bottom("X2_" + ts);
+      XX_param->add_top("XX_" + ts);
 
       // Add layer to compute
       //     XXpl_t := (X_t X_t^\top + \lambda I)^{-1}
-      LayerParameter* XXPL_param = net_param->add_layer();
-      XXPL_param->CopyFrom(sum_param);
-      XXPL_param->set_type("MatInv");
-      XXPL_param->mutable_matinv_param()->set_lambda(this->layer_param_.recurrent_tracker_param().lambda());
-      XXPL_param->set_name("XXpl" + ts);
-      XXPL_param->add_bottom("XX" + ts);
-      XXPL_param->add_top("XXpl" + ts);
+      LayerParameter* XXpl_param = net_param->add_layer();
+      XXpl_param->CopyFrom(sum_param);
+      XXpl_param->set_type("MatInv");
+      XXpl_param->mutable_matinv_param()->set_lambda(this->layer_param_.recurrent_tracker_param().lambda());
+      XXpl_param->set_name("XXpl_" + ts);
+      XXpl_param->add_bottom("XX_" + ts);
+      XXpl_param->add_top("XXpl_" + ts);
 
       // Add layer to compute
       //     XXplX_t := XXpl_t X_t
-      LayerParameter* XXPLX_param = net_param->add_layer();
-      XXPLX_param->CopyFrom(matmult_param);
-      XXPLX_param->set_name("XXplX" + ts);
-      XXPLX_param->add_bottom("XXpl" + ts);
-      XXPLX_param->add_bottom("X3" + ts);
-      XXPLX_param->add_top("XXplX" + ts);
+      LayerParameter* XXplX_param = net_param->add_layer();
+      XXplX_param->CopyFrom(matmult_param);
+      XXplX_param->set_name("XXplX_" + ts);
+      XXplX_param->add_bottom("XXpl_" + ts);
+      XXplX_param->add_bottom("X3_" + ts);
+      XXplX_param->add_top("XXplX_" + ts);
 
+      if (t == 1) {
+
+      // Add layer to compute
+      //     W_t := V_t^\top XXplX_t
+      LayerParameter* W_param = net_param->add_layer();
+      W_param->CopyFrom(matmult_param);
+      W_param->mutable_matmult_param()->set_transpose_a(true);
+      W_param->set_name("W_" + ts);
+      W_param->add_bottom("V_" + ts);
+      W_param->add_bottom("XXplX_" + ts);
+      W_param->add_top("W_" + ts);
+
+      // Add layer to compute
+      //     Y_t := X_t W_{t-1}^\top
+      LayerParameter* Y_param = net_param->add_layer();
+      Y_param->CopyFrom(matmult_param);
+      Y_param->mutable_matmult_param()->set_transpose_b(true);
+      Y_param->set_name("Y_" + ts);
+      Y_param->add_bottom("X4_" + ts);
+      Y_param->add_bottom("W_" + tm1s);
+      Y_param->add_top("Y_" + ts);
+
+      } else {
       // Add layer to compute
       //     Wstart_t := V_t^\top XXplX_t
       LayerParameter* Wstart_param = net_param->add_layer();
       Wstart_param->CopyFrom(matmult_param);
       Wstart_param->mutable_matmult_param()->set_transpose_a(true);
-      Wstart_param->set_name("Wstart" + ts);
-      Wstart_param->add_bottom("V" + ts);
-      Wstart_param->add_bottom("XXplX" + ts);
-      Wstart_param->add_top("Wstart" + ts);
-
-
+      Wstart_param->set_name("Wstart_" + ts);
+      Wstart_param->add_bottom("V_" + ts);
+      Wstart_param->add_bottom("XXplX_" + ts);
+      Wstart_param->add_top("Wstart_" + ts);
 
       // Add layer to split
       //     W_{t - 1} into 2 outputs
@@ -215,72 +228,63 @@ namespace caffe {
       W_split_param->add_top("W2_" + tm1s);
 
       // Add layer to compute
-      //     YmV_{t-1} := Y_{t-1} - V_{t-1}
-      LayerParameter* YmV_param = net_param->add_layer();
-      YmV_param->CopyFrom(sum_param);
-      EltwiseParameter* YmV_elm_param = YmV_param->mutable_eltwise_param();
-      YmV_elm_param->add_coeff(1.0);
-      YmV_elm_param->add_coeff(-1.0);
-      YmV_param->set_name("YmV_" + tm1s);
-      YmV_param->add_bottom("Y_" + tm1s);
-      YmV_param->add_bottom("V_" + tm1s);
-      YmV_param->add_top("YmV_" + tm1s);
-      
-      // Add layer to compute
-      //     XYmV_{t-1} := X_{t-1}^\top YmV_{t-1}
-      LayerParameter* XYmV_param = net_param->add_layer();
-      XYmV_param->CopyFrom(matmult_param);
-      XYmV_param->mutable_matmult_param()->set_transpose_a(true);
-      XYmV_param->set_name("XYmV_" + tm1s);
-      XYmV_param->add_bottom("X_" + tm1s);
-      XYmV_param->add_bottom("YmV_" + tm1s);
-      XYmV_param->add_top("XYmV_" + tm1s);
-
-      // Add layer to compute
-      //     bXYmV_{t-1} := \beta XYmV_{t-1}
-      LayerParameter* bXYmV_param = net_param->add_layer();
-      bXYmV_param->CopyFrom(scalar_param);
-      bXYmV_param->set_name("bXYmV_" + tm1s);
-      bXYmV_param->add_bottom("beta");
-      bXYmV_param->add_bottom("XYmV_" + tm1s);
-      bXYmV_param->add_top("bXYmV_" + tm1s);
-
-      // Add layer to compute
-      //     lW_{t-1} := \lambda W_{t-1}
-      LayerParameter* lW_param = net_param->add_layer();
-      lW_param->CopyFrom(scalar_param);
-      lW_param->set_name("lW_" + tm1s);
-      lW_param->add_bottom("lambda");
-      lW_param->add_bottom("W1_" + tm1s);
-      lW_param->add_top("lW_" + tm1s);
-
-      // Add layer to compute
-      //     bXYmVplW_{t-1} := bXYmV_{t-1} + lW_{t-1}
-      LayerParameter* bXYmVplW_param = net_param->add_layer();
-      bXYmVplW_param->CopyFrom(sum_param);
-      bXYmVplW_param->set_name("bXYmVplW_" + tm1s);
-      bXYmVplW_param->add_bottom("bXYmV_" + tm1s);
-      bXYmVplW_param->add_bottom("lW_" + tm1s);
-      bXYmVplW_param->add_top("bXYmVplW_" + tm1s);
-
-      // Add layer to compute
-      //     Wcont_t := W_{t-1} + bXYmVplW_{t-1}
-      LayerParameter* Wcont_param = net_param->add_layer();
-      Wcont_param->CopyFrom(sum_param);
-      Wcont_param->set_name("W_" + ts);
-      Wcont_param->add_bottom("W_" + tm1s);
-      Wcont_param->add_bottom("bXYmVplW_" + tm1s);
-      Wcont_param->add_top("W_" + ts);
-
-      // Add layer to compute
       //     Y_t := X_t W_{t-1}^\top
       LayerParameter* Y_param = net_param->add_layer();
       Y_param->CopyFrom(matmult_param);
       Y_param->mutable_matmult_param()->set_transpose_b(true);
       Y_param->set_name("Y_" + ts);
       Y_param->add_bottom("X4_" + ts);
-      Y_param->add_bottom("W_" + tm1s);
+      Y_param->add_bottom("W1_" + tm1s);
       Y_param->add_top("Y_" + ts);
+
+      // Add layer to compute
+      //     cW_{t-1} := (1 + \alpha\lambda) W_{t-1}
+      LayerParameter* cW_param = net_param->add_layer();
+      cW_param->CopyFrom(power_param);
+      cW_param->set_name("cW_" + tm1s);
+      cW_param->mutable_power_param()->set_scale(1 + alpha * lambda);
+      cW_param->add_bottom("W2_" + tm1s);
+      cW_param->add_top("cW_" + tm1s);
+
+      // Add layer to compute
+      //     YmV_t := Y_t - V_t
+      LayerParameter* YmV_param = net_param->add_layer();
+      YmV_param->CopyFrom(sum_param);
+      YmV_param->set_name("YmV_" + ts);
+      EltwiseParameter* YmV_elm_param = YmV_param->mutable_eltwise_param();
+      YmV_elm_param->add_coeff(1.0);
+      YmV_param->add_bottom("Y_" + ts);
+      YmV_elm_param->add_coeff(-1.0);
+      YmV_param->add_bottom("V_" + ts);
+      YmV_param->add_top("YmV_" + ts);
+      
+      // Add layer to compute
+      //     YmVX_t := YmV_t^\top X_t
+      LayerParameter* YmVX_param = net_param->add_layer();
+      YmVX_param->CopyFrom(matmult_param);
+      YmVX_param->set_name("YmVX_" + ts);
+      YmVX_param->mutable_matmult_param()->set_transpose_a(true);
+      YmVX_param->add_bottom("YmV_" + ts);
+      YmVX_param->add_bottom("X_" + ts);
+      YmVX_param->add_top("YmVX_" + ts);
+
+      // Add layer to compute
+      //     aYmVX_t := \alpha YmVX_t
+      LayerParameter* aYmVX_param = net_param->add_layer();
+      aYmVX_param->CopyFrom(power_param);
+      aYmVX_param->set_name("aYmVX_" + ts);
+      aYmVX_param->mutable_power_param()->set_scale(alpha);
+      aYmVX_param->add_bottom("YmVX_" + ts);
+      aYmVX_param->add_top("aYmVX_" + ts);
+
+      // Add layer to compute
+      //     Wcont_t := cW_{t-1} + aYmVX_t
+      LayerParameter* Wcont_param = net_param->add_layer();
+      Wcont_param->CopyFrom(sum_param);
+      Wcont_param->set_name("Wcont_" + ts);
+      Wcont_param->add_bottom("cW_" + tm1s);
+      Wcont_param->add_bottom("aYmVX_" + ts);
+      Wcont_param->add_top("Wcont_" + ts);
 
 
 
@@ -294,6 +298,7 @@ namespace caffe {
       W_param->add_bottom("cont_" + ts);
       W_param->add_top("W_" + ts);
 
+      }
       Y_concat_layer.add_bottom("Y_" + ts);
     }
 
