@@ -101,7 +101,7 @@ namespace caffe {
     //initialize feature_dim_ before calling RecurrentInputShapes
     //x input is a T_ x N_ x max_nseg x feature_dim_ array
     CHECK_GE(net_param->input_size(), 1);
-    CHECK_EQ(net_param->input(0).compare("X"), 0);
+    CHECK_EQ(net_param->input(0).compare("X"), 0); // 
     const BlobShape input_blob_shape = net_param->input_shape(0);
 
     //Check max_nseg >= max_ntrack
@@ -135,6 +135,7 @@ namespace caffe {
     Y_concat_layer.mutable_concat_param()->set_axis(0);
 
     for (int t = 1; t <= this->T_; ++t) {
+
       string tm1s = this->int_to_str(t - 1);
       string ts = this->int_to_str(t);
       
@@ -185,39 +186,17 @@ namespace caffe {
       XXplX_param->add_bottom("X3_" + ts);
       XXplX_param->add_top("XXplX_" + ts);
 
-      if (t == 1) {
-
       // Add layer to compute
-      //     W_t := V_t^\top XXplX_t
-      LayerParameter* W_param = net_param->add_layer();
-      W_param->CopyFrom(matmult_param);
-      W_param->mutable_matmult_param()->set_transpose_a(true);
-      W_param->set_name("W_" + ts);
-      W_param->add_bottom("V_" + ts);
-      W_param->add_bottom("XXplX_" + ts);
-      W_param->add_top("W_" + ts);
-
-      // Add layer to compute
-      //     Y_t := X_t W_{t-1}^\top
-      LayerParameter* Y_param = net_param->add_layer();
-      Y_param->CopyFrom(matmult_param);
-      Y_param->mutable_matmult_param()->set_transpose_b(true);
-      Y_param->set_name("Y_" + ts);
-      Y_param->add_bottom("X4_" + ts);
-      Y_param->add_bottom("W_" + tm1s);
-      Y_param->add_top("Y_" + ts);
-
-      } else {
-      // Add layer to compute
-      //     Wstart_t := V_t^\top XXplX_t
+      //     Wstart_{t - 1} := V_t^\top XXplX_t
       LayerParameter* Wstart_param = net_param->add_layer();
       Wstart_param->CopyFrom(matmult_param);
       Wstart_param->mutable_matmult_param()->set_transpose_a(true);
-      Wstart_param->set_name("Wstart_" + ts);
+      Wstart_param->set_name("Wstart_" + tm1s);
       Wstart_param->add_bottom("V_" + ts);
       Wstart_param->add_bottom("XXplX_" + ts);
-      Wstart_param->add_top("Wstart_" + ts);
-
+      Wstart_param->add_top("Wstart_" + tm1s);
+      
+      /*
       // Add layer to split
       //     W_{t - 1} into 2 outputs
       LayerParameter* W_split_param = net_param->add_layer();
@@ -226,24 +205,35 @@ namespace caffe {
       W_split_param->add_bottom("W_" + tm1s);
       W_split_param->add_top("W1_" + tm1s);
       W_split_param->add_top("W2_" + tm1s);
+      */
+
+      // Switch between Wstart_{t - 1} or W_{t - 1} depending on whether cont is true
+      LayerParameter* Wcont_param = net_param->add_layer();
+      Wcont_param->set_type("Switch");
+      Wcont_param->set_name("Wcont_" + tm1s);
+      Wcont_param->mutable_switch_param()->set_axis(2); // only consider dimensions starting with 2
+      Wcont_param->add_bottom("Wstart_" + tm1s);
+      Wcont_param->add_bottom("W_" + tm1s);
+      Wcont_param->add_bottom("cont_" + ts);
+      Wcont_param->add_top("Wcont_" + tm1s);
 
       // Add layer to compute
-      //     Y_t := X_t W_{t-1}^\top
+      //     Y_t := X_t Wcont_{t-1}^\top
       LayerParameter* Y_param = net_param->add_layer();
       Y_param->CopyFrom(matmult_param);
       Y_param->mutable_matmult_param()->set_transpose_b(true);
       Y_param->set_name("Y_" + ts);
       Y_param->add_bottom("X4_" + ts);
-      Y_param->add_bottom("W1_" + tm1s);
+      Y_param->add_bottom("Wcont_" + tm1s);
       Y_param->add_top("Y_" + ts);
 
       // Add layer to compute
-      //     cW_{t-1} := (1 + \alpha\lambda) W_{t-1}
+      //     cW_{t-1} := (1 + \alpha\lambda) Wcont_{t-1}
       LayerParameter* cW_param = net_param->add_layer();
       cW_param->CopyFrom(power_param);
       cW_param->set_name("cW_" + tm1s);
       cW_param->mutable_power_param()->set_scale(1 + alpha * lambda);
-      cW_param->add_bottom("W2_" + tm1s);
+      cW_param->add_bottom("Wcont_" + tm1s);
       cW_param->add_top("cW_" + tm1s);
 
       // Add layer to compute
@@ -257,7 +247,7 @@ namespace caffe {
       YmV_elm_param->add_coeff(-1.0);
       YmV_param->add_bottom("V_" + ts);
       YmV_param->add_top("YmV_" + ts);
-      
+
       // Add layer to compute
       //     YmVX_t := YmV_t^\top X_t
       LayerParameter* YmVX_param = net_param->add_layer();
@@ -278,27 +268,14 @@ namespace caffe {
       aYmVX_param->add_top("aYmVX_" + ts);
 
       // Add layer to compute
-      //     Wcont_t := cW_{t-1} + aYmVX_t
-      LayerParameter* Wcont_param = net_param->add_layer();
-      Wcont_param->CopyFrom(sum_param);
-      Wcont_param->set_name("Wcont_" + ts);
-      Wcont_param->add_bottom("cW_" + tm1s);
-      Wcont_param->add_bottom("aYmVX_" + ts);
-      Wcont_param->add_top("Wcont_" + ts);
-
-
-
-      // Finally, switch between Wcont_t or Wstart_t depending on whether cont is true
+      //     W_t := cW_{t-1} + aYmVX_t
       LayerParameter* W_param = net_param->add_layer();
-      W_param->set_type("Switch");
+      W_param->CopyFrom(sum_param);
       W_param->set_name("W_" + ts);
-      W_param->mutable_switch_param()->set_axis(2);
-      W_param->add_bottom("Wstart_" + ts);
-      W_param->add_bottom("Wcont_" + ts);
-      W_param->add_bottom("cont_" + ts);
+      W_param->add_bottom("cW_" + tm1s);
+      W_param->add_bottom("aYmVX_" + ts);
       W_param->add_top("W_" + ts);
 
-      }
       Y_concat_layer.add_bottom("Y_" + ts);
     }
 

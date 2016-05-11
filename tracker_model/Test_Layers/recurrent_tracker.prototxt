@@ -1,0 +1,43 @@
+name: "RecurrentTracker"
+
+## bottom[0]: X is T x N x max_nseg x dim
+## bottom[1]: V is T x N x max_nseg x max_ntrack
+## bottom[2]: cont is T x N
+
+input: "X"
+input_shape {
+  dim: 8
+  dim: 4
+  dim: 200
+  dim: 4096
+}
+
+input: "V"
+input_shape {
+  dim: 8
+  dim: 4
+  dim: 200
+  dim: 100
+}
+
+input: "cont"
+input_shape {
+  dim: 8
+  dim: 4
+}
+
+layer {
+  name: "recurrent_tracker"
+  type: "RecurrentTracker"
+  bottom: "X"
+  bottom: "V"
+  bottom: "cont"
+  top: "Y"
+  recurrent_tracker_param {
+    feature_dim: 4096
+    lambda: 0.5
+    alpha: 0.5
+    max_nseg: 200
+    max_ntrack: 100
+  }
+}

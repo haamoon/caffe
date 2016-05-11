@@ -185,4 +185,46 @@ namespace caffe {
     EXPECT_EQ(this->y_->shape(2), num_seg);
     EXPECT_EQ(this->y_->shape(3), num_track);
   }
+
+  TYPED_TEST(RecurrentTrackerLayerTest, TestForward) {
+    typedef typename TypeParam::Dtype Dtype;
+    vector<int> x_shape;
+    
+    int T = 2;
+    int N = 1;
+    int num_seg = 10;
+    int num_dim = 3;
+    int num_track = 4;
+    float lambda = .5;
+    float alpha = .5;
+    x_shape.push_back(T);
+    x_shape.push_back(N);
+    x_shape.push_back(num_seg);
+    x_shape.push_back(num_dim);
+    this->setbottom(x_shape, num_track, lambda, alpha);
+    
+    RecurrentTrackerLayer<Dtype> recurrent_tracker_layer(this->layer_param_);
+    
+    recurrent_tracker_layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+    
+    recurrent_tracker_layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+    
+    std::stringstream buffer;
+    buffer << "\nX = [ " << endl;
+    this->printMat(buffer, this->x_->cpu_data(), num_dim, this->x_->count());
+    buffer << "];" << endl << "V = [" << endl;
+    this->printMat(buffer, this->v_->cpu_data(), num_track, this->v_->count());
+    buffer << "];" << endl << "cont = [" << endl;
+    this->printMat(buffer, this->cont_->cpu_data(), N, this->cont_->count());
+    buffer << "];" << endl << "Y = [" << endl;
+    this->printMat(buffer, this->y_->cpu_data(), num_track, this->y_->count());
+    buffer << "];" << endl;
+    buffer << "T = " << T << ";" << endl;
+    buffer << "N = " << N << ";" << endl;
+    buffer << "lambda = " << lambda << ";" << endl;
+    buffer << "alpha = " << alpha << ";" << endl;
+    buffer << "num_track = " << num_track << ";" << endl;
+    
+    LOG(ERROR) << buffer.str();
+  }
 }  // namespace caffe

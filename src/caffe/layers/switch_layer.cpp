@@ -11,11 +11,12 @@ void SwitchLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   axis_ = bottom[0]->CanonicalAxisIndex(this->layer_param_.switch_param().axis());
   
   vector<int> top_shape = bottom[0]->shape();
-  
+  //LOG(ERROR) << "LAYER NAME: " << this->layer_param_.name();
   // Check that the dimensions of bottoms are all the same
   for (int i = 1; i < bottom.size() - 1; ++i) {
     vector<int> shape_i = bottom[i]->shape();
-    CHECK(shape_i == top_shape);
+    //LOG(ERROR)<<shape_i[0]<<", "<<shape_i[1]<<", "<<shape_i[2]<<", "<<shape_i[3];
+    CHECK(shape_i == top_shape) << "shape mismatch for bottom number " << i;
   }
   
   // Check the selector dimensions
