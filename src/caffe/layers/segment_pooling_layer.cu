@@ -30,7 +30,7 @@ void SegmentPoolingLayer<Dtype>::Forward_gpu(
     if(n_rows > 0) {
       CHECK_LE(n_rows, max_nrows_);
       CHECK_EQ(n_rows / nspatial_cell_, (float) n_rows / nspatial_cell_);
-      int nnz = pooling_ptr_cpu[n_rows + 1];
+      int nnz = pooling_ptr_cpu[n_rows];
       tracker_gpu_csr_gemm<Dtype>(CblasNoTrans, CblasTrans, n_rows,
                                   channels_,
                                   input_ncell_, (Dtype) 1., nnz, pooling_data,
@@ -66,7 +66,7 @@ void SegmentPoolingLayer<Dtype>::Backward_gpu(
   for(int n = 0; n < N_; n++) {
     int n_rows = seg_num[n] * nspatial_cell_;
     if(n_rows > 0) {
-      int nnz = pooling_ptr_cpu[n_rows + 1];
+      int nnz = pooling_ptr_cpu[n_rows];
       tracker_gpu_csr_gemm<Dtype>(CblasTrans, CblasNoTrans, input_ncell_,
                                 channels_,
                                 n_rows, (Dtype) 1., nnz, pooling_data,
