@@ -36,7 +36,7 @@ layer {
   recurrent_tracker_param {
     feature_dim: 4096
     lambda: 0.5
-    alpha: 0.5
+    alpha: 0.0001
     max_nseg: 200
     max_ntrack: 100
   }

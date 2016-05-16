@@ -74,8 +74,8 @@ namespace caffe {
   template <typename Dtype>
   void RecurrentTrackerLayer<Dtype>::FillUnrolledNet(NetParameter* net_param) const {
     const int max_ntrack = this->layer_param_.recurrent_tracker_param().max_ntrack();
-    const int lambda = this->layer_param_.recurrent_tracker_param().lambda();
-    const int alpha = this->layer_param_.recurrent_tracker_param().alpha();
+    const double lambda = this->layer_param_.recurrent_tracker_param().lambda();
+    const double alpha = this->layer_param_.recurrent_tracker_param().alpha();
     
     // Add generic LayerParameter's (without bottoms/tops) of layer types we'll
     // use to save redundant code.

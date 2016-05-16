@@ -17,14 +17,16 @@ max_nseg = 200
 max_ntrack = 100
 feature_dim = 4096
 lmbda = 0.5
-alpha = 0.5
+alpha = 0.0001
 t = 8
 n = 4
 
 np.random.seed(14344)
 X = np.random.uniform(size = (t, n, max_nseg, feature_dim))
 V = np.random.uniform(size = (t, n, max_nseg, max_ntrack))
-cont = np.zeros((t, n))
+cont = np.ones((t, n))
+for i in range(0, n):
+  cont[0][i] = 0
 
 net = caffe.Net(prototxt, caffe.TEST)
 net.blobs['X'].reshape(*X.shape)
@@ -36,12 +38,12 @@ net.blobs['cont'].data[...] = cont
 net.forward()
 
 Y = np.zeros((t, n, max_nseg, max_ntrack))
-Wprev = np.zeros((1, n, max_ntrack, feature_dim))
+Wprev = np.zeros((max_ntrack, feature_dim))
 for i in range(0, n):
   for j in range(0, t):
     Wstart = np.dot(np.dot(V[j][i].T, np.linalg.inv(np.dot(X[j][i], X[j][i].T) + np.multiply(lmbda, np.identity(max_nseg)))), X[j][i])
     Wcont = Wprev if cont[j][i] else Wstart
     Y[j][i] = np.dot(X[j][i], Wcont.T)
-    Wprev = np.multiply(1 + alpha * lmbda, Wcont) + np.multiply(alpha, np.dot((Y[j][i] - V[j][i]).T, X[j][i]))
+    Wprev = np.multiply(1 + alpha * lmbda, Wcont) + np.multiply(alpha, np.dot(np.transpose(Y[j][i] - V[j][i]), X[j][i]))
 
-print "difference:", np.linalg.norm(net.blobs['Y'].data - Y)
+print "normalized matrix difference:\n", (net.blobs['Y'].data - Y) / Y
