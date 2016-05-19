@@ -20,6 +20,7 @@
 #include "caffe/layers/eltwise_layer.hpp"
 #include "caffe/layers/conv_layer.hpp"
 #include "caffe/layers/inner_product_layer.hpp"
+#include "caffe/sequence_layers.hpp"
 namespace caffe {
 /**
  * @brief MatInvLayer. Compute A = (A + \lambda I)^{-1}.
@@ -375,6 +376,25 @@ protected:
   shared_ptr<PowerLayer<Dtype> > sqrt_layer_;
   Blob<Dtype> sqrt_output_;
   vector<Blob<Dtype>*> sqrt_top_vec_;
+};
+
+template <typename Dtype>
+    class RecurrentTrackerLayer : public RecurrentLayer<Dtype> {
+  public:
+    explicit RecurrentTrackerLayer(const LayerParameter& param)
+        : RecurrentLayer<Dtype>(param) {}
+        
+    virtual inline const char* type() const { return "RecurrentTracker"; }
+    virtual inline int MinBottomBlobs() const { return 3; }
+    virtual inline int MaxBottomBlobs() const { return 3; }
+    virtual inline int ExactNumTopBlobs() const { return 1; }
+  protected:
+    virtual void FillUnrolledNet(NetParameter* net_param) const;
+    virtual void RecurrentInputBlobNames(vector<string>* names) const;
+    virtual void RecurrentOutputBlobNames(vector<string>* names) const;
+    virtual void RecurrentInputShapes(vector<BlobShape>* shapes) const;
+    virtual void OutputBlobNames(vector<string>* names) const;
+    virtual void InputBlobNames(vector<string>* names) const;
 };
 
 }  // namespace caffe
