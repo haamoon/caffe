@@ -192,12 +192,23 @@ void tracker_cpu_transpose(const int m, const int n, const Dtype* a, const int l
 template void tracker_cpu_transpose<float>(const int m, const int n, const float* a, const int lda, float* b, const int ldb);
 template void tracker_cpu_transpose<double>(const int m, const int n, const double* a, const int lda, double* b, const int ldb);
 
+template <typename Dtype>
+void tracker_cpu_toInt(int n, const Dtype* in, int* out)
+{
+  for(int i = 0; i < n; i++) {
+    out[i] = static_cast<int> (in[i]);
+  }
+}
+
+template void tracker_cpu_toInt<float>(int n, const float* in, int* out);
+template void tracker_cpu_toInt<double>(int n, const double* in, int* out);
+
 
 template<typename Dtype>
 void tracker_cpu_csr_gemm(const CBLAS_TRANSPOSE TransA,
                         const CBLAS_TRANSPOSE TransB, const int M, const int N,
                         const int K, const Dtype alpha, const int nzz,
-                        const Dtype* A, const Dtype* indices, const Dtype* ptr,
+                        const Dtype* A, const int* indices, const int* ptr,
                         const Dtype* B, const Dtype beta, Dtype* C,
                         const CBLAS_ORDER orderC) {
   if (TransA == CblasNoTrans) {  // CSR
@@ -304,8 +315,8 @@ template void tracker_cpu_csr_gemm<float>(const CBLAS_TRANSPOSE TransA,
                                         const CBLAS_TRANSPOSE TransB,
                                         const int M, const int N, const int K,
                                         const float alpha, const int nzz,
-                                        const float* A, const float* indices,
-                                        const float* ptr, const float* B,
+                                        const float* A, const int* indices,
+                                        const int* ptr, const float* B,
                                         const float beta, float* C,
                                         const CBLAS_ORDER orderC);
                         
@@ -313,8 +324,8 @@ template void tracker_cpu_csr_gemm<double>(const CBLAS_TRANSPOSE TransA,
                                          const CBLAS_TRANSPOSE TransB,
                                          const int M, const int N, const int K,
                                          const double alpha, const int nzz,
-                                         const double* A, const double* indices,
-                                         const double* ptr, const double* B,
+                                         const double* A, const int* indices,
+                                         const int* ptr, const double* B,
                                          const double beta, double* C,
                                          const CBLAS_ORDER orderC);
 

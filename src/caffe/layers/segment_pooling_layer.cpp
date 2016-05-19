@@ -38,9 +38,23 @@ namespace caffe {
     
     CHECK_EQ(max_nrows_ / nspatial_cell_, (float) max_nrows_ / nspatial_cell_);
     
+    
+    int_indices_.Reshape(bottom[2]->shape());
+    int_ptrs_.Reshape(bottom[3]->shape());
+    
     vector<int> top_shape = bottom[4]->shape();
-    top_shape.push_back(max_nrows_/nspatial_cell_);
+    
+    // for N_ == 1 we can use actual seg_num value
+    if(N_ == 1 && *(bottom[4]->cpu_data()) > 0) {
+      int seg_num  = *(bottom[4]->cpu_data());
+      top_shape.push_back(seg_num);
+    } else {
+      top_shape.push_back(max_nrows_/nspatial_cell_);
+    }
+    
     top_shape.push_back(channels_ * nspatial_cell_);
+    
+    
     
     top[0]->Reshape(top_shape);
 }
@@ -51,13 +65,15 @@ void SegmentPoolingLayer<Dtype>::Forward_cpu(
     const vector<Blob<Dtype>*>& top) {
 
   const Dtype* input = bottom[0]->cpu_data();
-  
   const Dtype* pooling_data = bottom[1]->cpu_data();
-  const Dtype* pooling_indices = bottom[2]->cpu_data();
-  const Dtype* pooling_ptr = bottom[3]->cpu_data();
   const Dtype* seg_num = bottom[4]->cpu_data();
   
   
+  int* int_indices_data = int_indices_.mutable_cpu_data();
+  int* int_ptrs_data = int_ptrs_.mutable_cpu_data();
+  
+  tracker_cpu_toInt(bottom[2]->count(), bottom[2]->cpu_data(), int_indices_data);
+  tracker_cpu_toInt(bottom[3]->count(), bottom[3]->cpu_data(), int_ptrs_data);
 
   Dtype* top_data = top[0]->mutable_cpu_data();
   caffe_set<Dtype>(top[0]->count(), (Dtype) 0.0, top_data);
@@ -65,19 +81,19 @@ void SegmentPoolingLayer<Dtype>::Forward_cpu(
     int n_rows = seg_num[n] * nspatial_cell_;
     CHECK_LE(n_rows, max_nrows_);
     CHECK_EQ(n_rows / nspatial_cell_, (float) n_rows / nspatial_cell_);
-    int nnz = pooling_ptr[n_rows + 1];
+    int nnz = int_ptrs_data[n_rows + 1];
     tracker_cpu_csr_gemm<Dtype>(CblasNoTrans, CblasTrans, n_rows,
                               channels_,
                               input_ncell_, (Dtype) 1., nnz, pooling_data,
-                              pooling_indices, pooling_ptr, input,
+                              int_indices_data, int_ptrs_data, input,
                               (Dtype) 0.,
                               top_data, CblasRowMajor);
     
     
     input += channels_ * input_ncell_;
     pooling_data += max_data_len_;
-    pooling_indices += max_data_len_;
-    pooling_ptr += max_nrows_ + 1;
+    int_indices_data += max_data_len_;
+    int_ptrs_data += max_nrows_ + 1;
     top_data += max_nrows_ * channels_;
   }
 }
@@ -88,29 +104,30 @@ void SegmentPoolingLayer<Dtype>::Backward_cpu(
     const vector<bool>& propagate_down,
     const vector<Blob<Dtype>*>& bottom) {
   const Dtype* pooling_data = bottom[1]->cpu_data();
-  const Dtype* pooling_indices = bottom[2]->cpu_data();
-  const Dtype* pooling_ptr = bottom[3]->cpu_data();
+  const int* int_indices_data = int_indices_.cpu_data();
+  const int* int_ptrs_data = int_ptrs_.cpu_data();
   const Dtype* seg_num = bottom[4]->cpu_data();
   
   Dtype* bottom_diff = bottom[0]->mutable_cpu_diff();
   const Dtype* top_diff = top[0]->cpu_diff();
   
+  
   caffe_set<Dtype>(bottom[0]->count(), (Dtype) 0.0, bottom_diff);
   for(int n = 0; n < N_; n++) {
     int n_rows = seg_num[n] * nspatial_cell_;
-    int nnz = pooling_ptr[n_rows + 1];
+    int nnz = int_ptrs_data[n_rows + 1];
     tracker_cpu_csr_gemm<Dtype>(CblasTrans, CblasNoTrans, input_ncell_,
                               channels_,
                               n_rows, (Dtype) 1., nnz, pooling_data,
-                              pooling_indices, pooling_ptr, top_diff,
+                              int_indices_data, int_ptrs_data, top_diff,
                               (Dtype) 0.,
                               bottom_diff,
                               CblasColMajor);
   
     bottom_diff += channels_ * input_ncell_;
     pooling_data += max_data_len_;
-    pooling_indices += max_data_len_;
-    pooling_ptr += max_nrows_ + 1;
+    int_indices_data += max_data_len_;
+    int_ptrs_data += max_nrows_ + 1;
     top_diff += max_nrows_ * channels_;
   }
 }

@@ -49,13 +49,16 @@ template <typename Dtype>
 void tracker_cpu_transpose(const int m, const int n, const Dtype* a, const int lda, Dtype* b, const int ldb);
 
 template <typename Dtype>
+void tracker_cpu_toInt(int n, const Dtype* in, int* out);
+
+template <typename Dtype>
 void tracker_axpy(const int N, const Dtype alpha, const Dtype* X, Dtype* Y, const int ldx = 1, const int ldy = 1);
 
 template<typename Dtype>
 void tracker_cpu_csr_gemm(const CBLAS_TRANSPOSE TransA,
                         const CBLAS_TRANSPOSE TransB, const int M, const int N,
                         const int K, const Dtype alpha, const int nzz,
-                        const Dtype* A, const Dtype* indices, const Dtype* ptr,
+                        const Dtype* A, const int* indices, const int* ptr,
                         const Dtype* B, const Dtype beta, Dtype* C,
                         const CBLAS_ORDER orderC);
 
@@ -83,6 +86,9 @@ void tracker_gpu_strided_add_scalar(const int N, const Dtype alpha, int incx, Dt
 
 template <typename Dtype>
 void tracker_gpu_transpose(const int m, const int n, const Dtype* a, const int lda, Dtype* b, const int ldb);
+
+template <typename Dtype>
+void tracker_gpu_toInt(int n, const Dtype* in, int* out);
 
 template<typename Dtype>
 void tracker_gpu_csr_gemm(const CBLAS_TRANSPOSE TransA,

@@ -124,6 +124,8 @@ private:
   int max_data_len_;
   int nspatial_cell_;
   int max_nrows_;
+  Blob<int> int_indices_;
+  Blob<int> int_ptrs_;
 };
 
 

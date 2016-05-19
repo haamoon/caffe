@@ -62,8 +62,8 @@ void LinearTrackerLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   max_nseg_ = feature_shape[input_start_axis_];
   feature_dim_ = feature_shape[input_start_axis_ + 1];
   
-  CHECK_EQ(max_nseg_, v_shape[input_start_axis_]);
-  CHECK_EQ(max_ntrack_, v_shape[input_start_axis_ + 1]);
+  //CHECK_EQ(max_nseg_, v_shape[input_start_axis_]);
+  //CHECK_EQ(max_ntrack_, v_shape[input_start_axis_ + 1]);
   
   
   int max_nsample = max_nseg_ / sample_inter_;
@@ -178,10 +178,16 @@ void LinearTrackerLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
   InnerProductLayer<Dtype>::Backward_cpu(top, propagate_down, bottom);
   
   //add \lambda W to the gradient
-  //if(lambda_ != 0) {
-  //  caffe_axpy<Dtype>(this->blobs_[0]->count(), lambda_, this->blobs_[0]->cpu_data(), this->blobs_[0]->mutable_cpu_diff());
-  //  caffe_axpy<Dtype>(this->blobs_[1]->count(), lambda_, this->blobs_[1]->cpu_data(), this->blobs_[1]->mutable_cpu_diff());
+  if(lambda_ != 0) {
+    caffe_axpy<Dtype>(this->blobs_[0]->count(), lambda_, this->blobs_[0]->cpu_data(), this->blobs_[0]->mutable_cpu_diff());
+    caffe_axpy<Dtype>(this->blobs_[1]->count(), lambda_, this->blobs_[1]->cpu_data(), this->blobs_[1]->mutable_cpu_diff());
+  }
+  
+  //int cont = static_cast<int>(*bottom[2]->cpu_data());
+  //if(cont == 0) {
+  //  caffe_set(bottom[0]->count(), (Dtype) 0.0, bottom[0]->mutable_cpu_diff());
   //}
+  
 }
 
 #ifdef CPU_ONLY

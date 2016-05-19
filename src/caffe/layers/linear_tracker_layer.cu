@@ -99,10 +99,15 @@ void LinearTrackerLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   InnerProductLayer<Dtype>::Backward_gpu(top, propagate_down, bottom);
   
   //add \lambda W to the gradient
-  if(lambda_ != 0) {
-    caffe_gpu_axpy<Dtype>(this->blobs_[0]->count(), lambda_, this->blobs_[0]->gpu_data(), this->blobs_[0]->mutable_gpu_diff());
-    caffe_gpu_axpy<Dtype>(this->blobs_[1]->count(), lambda_, this->blobs_[1]->gpu_data(), this->blobs_[1]->mutable_gpu_diff());
-  }
+  //if(lambda_ != 0) {
+  //  caffe_gpu_axpy<Dtype>(this->blobs_[0]->count(), lambda_, this->blobs_[0]->gpu_data(), this->blobs_[0]->mutable_gpu_diff());
+  //  caffe_gpu_axpy<Dtype>(this->blobs_[1]->count(), lambda_, this->blobs_[1]->gpu_data(), this->blobs_[1]->mutable_gpu_diff());
+  //}
+  
+  //int cont = static_cast<int>(*bottom[2]->cpu_data());
+  //if(cont == 0) {
+  //  caffe_gpu_set(bottom[0]->count(), (Dtype) 0.0, bottom[0]->mutable_gpu_diff());
+  //}
 }
 
 template <typename Dtype>

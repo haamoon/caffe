@@ -381,9 +381,23 @@ void tracker_gpu_transpose(const int m, const int n, const Dtype* a, const int l
 template void tracker_gpu_transpose<float>(const int m, const int n, const float* a, const int lda, float* b, const int ldb);
 template void tracker_gpu_transpose<double>(const int m, const int n, const double* a, const int lda, double* b, const int ldb);
 
+template <typename Dtype>
+__global__ void toInt_kernel(int n, const Dtype* in, int* out)
+{
+  CUDA_KERNEL_LOOP(index, n) {
+    out[index] = static_cast<int>(in[index]);
+  }
+}
 
+template <typename Dtype>
+void tracker_gpu_toInt(int n, const Dtype* in, int* out)
+{
+  toInt_kernel<Dtype><<<CAFFE_GET_BLOCKS(n), CAFFE_CUDA_NUM_THREADS>>>(n, in, out);
+}
 
-  
+template void tracker_gpu_toInt<float>(int n, const float* in, int* out);
+template void tracker_gpu_toInt<double>(int n, const double* in, int* out);
+
 template<typename Dtype>
 __device__ void tracker_gpu_csr_gemm_kernel_core(const int M, const int N,
                                                const int K, const Dtype alpha,
@@ -574,36 +588,37 @@ void tracker_gpu_csr_gemm_cusparse<float>(const CBLAS_TRANSPOSE TransA,
     float* C, const CBLAS_ORDER orderC) {
 
   //std::cout << "M: " << M << " N: " << N << " K: " << K << " NZZ: " << nzz <<"\n"  ;
-
   int ldb = (TransB == CblasNoTrans) ? N : K;
   cusparseOperation_t cuTransA =
       (TransA == CblasNoTrans) ? CUSPARSE_OPERATION_NON_TRANSPOSE : CUSPARSE_OPERATION_TRANSPOSE;
   cusparseOperation_t cuTransB =
       (TransB == CblasNoTrans) ? CUSPARSE_OPERATION_TRANSPOSE : CUSPARSE_OPERATION_NON_TRANSPOSE;
 
-  float* Bt;
-  int ldb_t;
-
-  bool reuiqre_transpose_B = (cuTransA == CUSPARSE_OPERATION_TRANSPOSE) && (cuTransB == CUSPARSE_OPERATION_TRANSPOSE);
-  if (reuiqre_transpose_B){
-    //we need to transpose B because this operation is not supported by cusparse (god knows why)
-    ldb_t = K;
-    const float zero = 0.0;
-    const float one = 1.0;
-    CUDA_CHECK(cudaMalloc((void**)&Bt, sizeof(float)*K*N));
-    CUBLAS_CHECK(cublasSgeam(Caffe::cublas_handle(), CUBLAS_OP_T, CUBLAS_OP_T, K, N, &one, B, ldb, &zero, B, ldb, Bt, ldb_t));
-  }
-
+  float* A_t;
+  int* A_t_indices;
+  int* A_t_ptr;
+  
   int msparse = (TransA == CblasNoTrans) ? M : K;
   int ksparse = (TransA == CblasNoTrans) ? K : M;
+  
+  bool reuiqre_transpose_A = (cuTransA == CUSPARSE_OPERATION_TRANSPOSE) && (cuTransB == CUSPARSE_OPERATION_TRANSPOSE);
+  if (reuiqre_transpose_A){
+    CUDA_CHECK(cudaMalloc((void**)&A_t, sizeof(float)*nzz));
+    CUDA_CHECK(cudaMalloc((int**)&A_t_indices, sizeof(int)*nzz));
+    CUDA_CHECK(cudaMalloc((int**)&A_t_ptr, sizeof(int)*(ksparse+1)));
+    CUSPARSE_CHECK(cusparseScsr2csc(Caffe::cusparse_handle(), msparse, ksparse, nzz, A, ptr, indices, A_t, A_t_indices, A_t_ptr, CUSPARSE_ACTION_NUMERIC, CUSPARSE_INDEX_BASE_ZERO));
+  }
+
   if (orderC == CblasRowMajor){
     float* Ct;
     CUDA_CHECK(cudaMalloc((void**)&Ct, sizeof(float)*M*N));
     const float zero = 0.0;
     const float one = 1.0;
-    if (reuiqre_transpose_B){
-      CUSPARSE_CHECK(cusparseScsrmm2(Caffe::cusparse_handle(), cuTransA, CUSPARSE_OPERATION_NON_TRANSPOSE, msparse, N, ksparse,nzz, &alpha, Caffe::cusparse_mat_descr(), A, ptr, indices, Bt,  ldb_t, &zero, Ct, M));
-      CUDA_CHECK(cudaFree(Bt));
+    if (reuiqre_transpose_A){
+      CUSPARSE_CHECK(cusparseScsrmm2(Caffe::cusparse_handle(), CUSPARSE_OPERATION_NON_TRANSPOSE, cuTransB, ksparse, N, msparse,nzz, &alpha, Caffe::cusparse_mat_descr(), A_t, A_t_ptr, A_t_indices, B,  ldb, &zero, Ct, M));
+      CUDA_CHECK(cudaFree(A_t));
+      CUDA_CHECK(cudaFree(A_t_indices));
+      CUDA_CHECK(cudaFree(A_t_ptr));
     }else{
       CUSPARSE_CHECK(cusparseScsrmm2(Caffe::cusparse_handle(), cuTransA, cuTransB, msparse, N, ksparse,nzz, &alpha, Caffe::cusparse_mat_descr(), A, ptr, indices, B,  ldb, &zero, Ct, M));
     }
@@ -611,14 +626,17 @@ void tracker_gpu_csr_gemm_cusparse<float>(const CBLAS_TRANSPOSE TransA,
     CUDA_CHECK(cudaFree(Ct));
   }else{
     //this is the default of CUSPARSE by the Matrix B is by default rowmajor
-    if (reuiqre_transpose_B){
-      CUSPARSE_CHECK(cusparseScsrmm2(Caffe::cusparse_handle(), cuTransA, CUSPARSE_OPERATION_NON_TRANSPOSE, msparse, N, ksparse,nzz, &alpha, Caffe::cusparse_mat_descr(), A, ptr, indices, Bt,  ldb_t, &beta, C, M));
-      CUDA_CHECK(cudaFree(Bt));
+    if (reuiqre_transpose_A){
+      CUSPARSE_CHECK(cusparseScsrmm2(Caffe::cusparse_handle(), CUSPARSE_OPERATION_NON_TRANSPOSE, cuTransB, ksparse, N, msparse,nzz, &alpha, Caffe::cusparse_mat_descr(), A_t, A_t_ptr, A_t_indices, B,  ldb, &beta, C, M));      
+      CUDA_CHECK(cudaFree(A_t));
+      CUDA_CHECK(cudaFree(A_t_indices));
+      CUDA_CHECK(cudaFree(A_t_ptr));
     }else{
       CUSPARSE_CHECK(cusparseScsrmm2(Caffe::cusparse_handle(), cuTransA, cuTransB, msparse, N, ksparse,nzz, &alpha, Caffe::cusparse_mat_descr(), A, ptr, indices, B,  ldb, &beta, C, M));
     }
   }
 }
+
 
 template <>
 void tracker_gpu_csr_gemm_cusparse<double>(const CBLAS_TRANSPOSE TransA,
@@ -633,28 +651,32 @@ void tracker_gpu_csr_gemm_cusparse<double>(const CBLAS_TRANSPOSE TransA,
   cusparseOperation_t cuTransB =
       (TransB == CblasNoTrans) ? CUSPARSE_OPERATION_TRANSPOSE : CUSPARSE_OPERATION_NON_TRANSPOSE;
 
-  double* Bt;
-  int ldb_t;
-  bool reuiqre_transpose_B = (cuTransA == CUSPARSE_OPERATION_TRANSPOSE) && (cuTransB == CUSPARSE_OPERATION_TRANSPOSE);
-  if (reuiqre_transpose_B){
-    //we need to transpose B because this operation is not supported by cusparse (god knows why)
-    ldb_t = K;
-    const double zero = 0.0;
-    const double one = 1.0;
-    CUDA_CHECK(cudaMalloc((void**)&Bt, sizeof(double)*K*N));
-    CUBLAS_CHECK(cublasDgeam(Caffe::cublas_handle(), CUBLAS_OP_T, CUBLAS_OP_T, K, N, &one, B, ldb, &zero, B, ldb, Bt, ldb_t));
-  }
-
+  double* A_t;
+  int* A_t_indices;
+  int* A_t_ptr;
+  
   int msparse = (TransA == CblasNoTrans) ? M : K;
   int ksparse = (TransA == CblasNoTrans) ? K : M;
+  
+  bool reuiqre_transpose_A = (cuTransA == CUSPARSE_OPERATION_TRANSPOSE) && (cuTransB == CUSPARSE_OPERATION_TRANSPOSE);
+  if (reuiqre_transpose_A){
+    CUDA_CHECK(cudaMalloc((void**)&A_t, sizeof(double)*nzz));
+    CUDA_CHECK(cudaMalloc((int**)&A_t_indices, sizeof(int)*nzz));
+    CUDA_CHECK(cudaMalloc((int**)&A_t_ptr, sizeof(int)*(ksparse+1)));
+    CUSPARSE_CHECK(cusparseDcsr2csc(Caffe::cusparse_handle(), msparse, ksparse, nzz, A, ptr, indices, A_t, A_t_indices, A_t_ptr, CUSPARSE_ACTION_NUMERIC, CUSPARSE_INDEX_BASE_ZERO));
+  }
+
+  
   if (orderC == CblasRowMajor){
     double* Ct;
     CUDA_CHECK(cudaMalloc((void**)&Ct, sizeof(double)*M*N));
     const double zero = 0.0;
     const double one = 1.0;
-    if (reuiqre_transpose_B){
-      CUSPARSE_CHECK(cusparseDcsrmm2(Caffe::cusparse_handle(), cuTransA, CUSPARSE_OPERATION_NON_TRANSPOSE, msparse, N, ksparse,nzz, &alpha, Caffe::cusparse_mat_descr(), A, ptr, indices, Bt,  ldb_t, &zero, Ct, M));
-      CUDA_CHECK(cudaFree(Bt));
+    if (reuiqre_transpose_A){
+      CUSPARSE_CHECK(cusparseDcsrmm2(Caffe::cusparse_handle(), CUSPARSE_OPERATION_NON_TRANSPOSE, cuTransB, ksparse, N, msparse,nzz, &alpha, Caffe::cusparse_mat_descr(), A_t, A_t_ptr, A_t_indices, B,  ldb, &zero, Ct, M));
+      CUDA_CHECK(cudaFree(A_t));
+      CUDA_CHECK(cudaFree(A_t_indices));
+      CUDA_CHECK(cudaFree(A_t_ptr));
     }else{
       CUSPARSE_CHECK(cusparseDcsrmm2(Caffe::cusparse_handle(), cuTransA, cuTransB, msparse, N, ksparse,nzz, &alpha, Caffe::cusparse_mat_descr(), A, ptr, indices, B,  ldb, &zero, Ct, M));
     }
@@ -662,9 +684,11 @@ void tracker_gpu_csr_gemm_cusparse<double>(const CBLAS_TRANSPOSE TransA,
     CUDA_CHECK(cudaFree(Ct));
   }else{
     //this is the default of CUSPARSE by the Matrix B is by default rowmajor
-    if (reuiqre_transpose_B){
-      CUSPARSE_CHECK(cusparseDcsrmm2(Caffe::cusparse_handle(), cuTransA, CUSPARSE_OPERATION_NON_TRANSPOSE, msparse, N, ksparse,nzz, &alpha, Caffe::cusparse_mat_descr(), A, ptr, indices, Bt,  ldb_t, &beta, C, M));
-      CUDA_CHECK(cudaFree(Bt));
+    if (reuiqre_transpose_A){
+      CUSPARSE_CHECK(cusparseDcsrmm2(Caffe::cusparse_handle(), CUSPARSE_OPERATION_NON_TRANSPOSE, cuTransB, ksparse, N, msparse,nzz, &alpha, Caffe::cusparse_mat_descr(), A_t, A_t_ptr, A_t_indices, B,  ldb, &beta, C, M));      
+      CUDA_CHECK(cudaFree(A_t));
+      CUDA_CHECK(cudaFree(A_t_indices));
+      CUDA_CHECK(cudaFree(A_t_ptr));
     }else{
       CUSPARSE_CHECK(cusparseDcsrmm2(Caffe::cusparse_handle(), cuTransA, cuTransB, msparse, N, ksparse,nzz, &alpha, Caffe::cusparse_mat_descr(), A, ptr, indices, B,  ldb, &beta, C, M));
     }
