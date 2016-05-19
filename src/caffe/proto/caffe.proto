@@ -306,7 +306,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 149 (last added: filter2d_param)
+// LayerParameter next available layer-specific ID: 151 (last added: switch_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -383,6 +383,8 @@ message LayerParameter {
   optional InputParameter input_param = 143;
   optional LogParameter log_param = 134;
   optional LRNParameter lrn_param = 118;
+  optional MatInvParameter matinv_param = 150;
+  optional MatMultParameter matmult_param = 149;
   optional MemoryDataParameter memory_data_param = 119;
   optional MVNParameter mvn_param = 120;
   optional PoolingParameter pooling_param = 121;
@@ -397,6 +399,7 @@ message LayerParameter {
   optional SoftmaxParameter softmax_param = 125;
   optional SPPParameter spp_param = 132;
   optional SliceParameter slice_param = 126;
+  optional SwitchParameter switch_param = 151;
   optional TanHParameter tanh_param = 127;
   optional ThresholdParameter threshold_param = 128;
   optional TileParameter tile_param = 138;
@@ -861,6 +864,16 @@ message LRNParameter {
   optional Engine engine = 6 [default = DEFAULT];
 }
 
+message MatInvParameter {
+    optional float lambda = 1 [default = .5];
+}
+
+message MatMultParameter {
+    repeated bool diagonal_input = 1;
+    optional bool transpose_a = 2 [default = false];
+    optional bool transpose_b = 3 [default = false];
+}
+
 message MemoryDataParameter {
   optional uint32 batch_size = 1;
   optional uint32 channels = 2;
@@ -1108,6 +1121,13 @@ message SoftmaxParameter {
   // from the end (e.g., -1 for the last axis).
   // Any other axes will be evaluated as independent softmaxes.
   optional int32 axis = 2 [default = 1];
+}
+
+message SwitchParameter {
+  // The first axis of bottom[0] to apply select (last bottom).  May be negative to index from the end
+  // (e.g., -1 for the last axis).
+  //
+  optional int32 axis = 1 [default = 0];
 }
 
 message TanHParameter {
