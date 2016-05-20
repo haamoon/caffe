@@ -175,6 +175,7 @@ namespace caffe {
       XXpl_param->mutable_matinv_param()->set_lambda(this->layer_param_.recurrent_tracker_param().lambda());
       XXpl_param->set_name("XXpl_" + ts);
       XXpl_param->add_bottom("XX_" + ts);
+      XXpl_param->add_bottom("cont_" + ts);
       XXpl_param->add_top("XXpl_" + ts);
 
       // Add layer to compute
