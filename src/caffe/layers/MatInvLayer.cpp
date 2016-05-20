@@ -64,19 +64,17 @@ void MatInvLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
 	const Dtype* input_data = bottom[0]->cpu_data();
 	Dtype* output_data = top[0]->mutable_cpu_data();
 	
-  const Dtype* coef = NULL;
-  
+  const Dtype* cont = NULL;
   if(bottom.size() > 1) {
-    coef = bottom[1]->cpu_data();
+    cont = bottom[1]->cpu_data();
   }
 	caffe_copy(N_* offset_, input_data, output_data);
   float lambda = lambda_;
 	for (int n = 0; n < N_; ++n) {
-    if(coef != NULL) {
-      lambda = lambda_ * coef[n];
-    }
+      if (cont != NULL && cont[n] == 0) {
 		caffe_strided_add_scalar<Dtype>(offset_, lambda, dim_ + 1, output_data + offset_ * n);
 		caffe_cpu_inverse<Dtype>(dim_, output_data + offset_ * n);
+      }
 	}
 }
 
@@ -84,41 +82,33 @@ void MatInvLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
 template <typename Dtype>
 void MatInvLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
-	if (!propagate_down[0] && (bottom.size() < 2 or !propagate_down[1])) {
-    	return;
+  if (!propagate_down[0] && (bottom.size() < 2 or !propagate_down[1])) {
+    return;
   }
   
-	Dtype* input_diff = bottom[0]->mutable_cpu_diff();
-	const Dtype* output_data = top[0]->cpu_data();
+  Dtype* input_diff = bottom[0]->mutable_cpu_diff();
+  const Dtype* output_data = top[0]->cpu_data();
   const Dtype* output_diff = top[0]->cpu_diff();
-  
-  Dtype* coef_diff = NULL;
-  
-  if(bottom.size() > 1) {
-    coef_diff = bottom[1]->mutable_cpu_diff();
+
+  const Dtype* cont = NULL;
+  if (bottom.size() > 1) {
+    cont = bottom[1]->cpu_data();
   }
   
   for (int n = 0; n < N_; ++n) {
-		// A' = - B^\top B' B^\top
-    caffe_cpu_gemm<Dtype>(CblasTrans, CblasNoTrans, dim_,
+    if (cont != NULL && cont[n] == 0) {
+	  // A' = - B^\top B' B^\top
+      caffe_cpu_gemm<Dtype>(CblasTrans, CblasNoTrans, dim_,
     		dim_, dim_,
     	    (Dtype)-1., output_data + offset_ * n, output_diff + offset_ * n,
     	    (Dtype)0., tmp_buffer_.mutable_cpu_data());
     	    
-    caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasTrans, dim_,
+      caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasTrans, dim_,
     		dim_, dim_,
     	    (Dtype)1., tmp_buffer_.cpu_data(), output_data + offset_ * n,
     	    (Dtype)0., input_diff + offset_ * n);
-    
-    if(coef_diff != NULL) {
-      //\beta' = - \lambda < B', BB>
-      caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, dim_,
-                          dim_, dim_,
-                          (Dtype) -lambda_, output_data + offset_ * n, output_data + offset_ * n,
-                          (Dtype)0., tmp_buffer_.mutable_cpu_data());
-      coef_diff[n] = caffe_cpu_dot(offset_, output_data + offset_ * n, tmp_buffer_.cpu_data());
     }
-	}
+  }
 }
 
 #ifdef CPU_ONLY

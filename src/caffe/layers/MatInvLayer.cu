@@ -40,12 +40,8 @@ void MatInvLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
   const Dtype* input_data = bottom[0]->gpu_data();
   int count = bottom[0]->count();
 
-  const Dtype* coef = NULL;
-  if(bottom.size() > 1) {
-    coef = bottom[1]->gpu_data();
-  }
   AddLambdaEye<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
-          count, input_data, tmp_data, (Dtype) lambda_, coef, offset_, dim_);
+          count, input_data, tmp_data, (Dtype) lambda_, NULL, offset_, dim_);
   caffe_gpu_inverse<Dtype>(dim_, tmp_data, top[0]->mutable_gpu_data(), N_);
 }
 
@@ -57,39 +53,30 @@ void MatInvLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     return;
   }
 
-  Dtype* coef_diff = NULL;
-  if(bottom.size() > 1) {
-    coef_diff = bottom[1]->mutable_cpu_diff();
-  }
-
 	Dtype* input_diff = bottom[0]->mutable_gpu_diff();
 	const Dtype* output_data = top[0]->gpu_data();
   const Dtype* output_diff = top[0]->gpu_diff();
 
 
+  const Dtype* cont = NULL;
+  if(bottom.size() > 1) {
+    cont = bottom[1]->gpu_data();
+  }
 
   for (int n = 0; n < N_; ++n) {
-    // A' = - B^\top B' B^\top
-    caffe_gpu_gemm<Dtype>(CblasTrans, CblasNoTrans, dim_,
+    if (cont != NULL && cont[n] == 0) {
+      // A' = - B^\top B' B^\top
+      caffe_gpu_gemm<Dtype>(CblasTrans, CblasNoTrans, dim_,
           dim_, dim_,
     	    (Dtype)-1., output_data + offset_ * n, output_diff + offset_ * n,
     	    (Dtype)0., tmp_buffer_.mutable_gpu_data());
     	    
-    caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasTrans, dim_,
+      caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasTrans, dim_,
           dim_, dim_,
     	    (Dtype)1., tmp_buffer_.gpu_data(), output_data + offset_ * n,
     	    (Dtype)0., input_diff + offset_ * n);
-
-    if(coef_diff != NULL) {
-      //\beta' = - \lambda < B', BB>
-      caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, dim_,
-                            dim_, dim_,
-                            (Dtype) -lambda_, output_data + offset_ * n, output_data + offset_ * n,
-                            (Dtype)0., tmp_buffer_.mutable_gpu_data());
-
-      caffe_gpu_dot(offset_, output_data + offset_ * n, tmp_buffer_.gpu_data(), coef_diff + n);
     }
-	}
+  }
 }
 
 INSTANTIATE_LAYER_GPU_FUNCS(MatInvLayer);
