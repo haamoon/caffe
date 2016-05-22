@@ -54,31 +54,45 @@ void RecurrentLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   NetParameter net_param;
   net_param.set_force_backward(true);
   
-  BlobShape input_shape;
+  LayerParameter* input_layer_param = net_param.add_layer();
+  input_layer_param->set_type("Input");
+  input_layer_param->set_name("input");
+  
+  InputParameter* input_param = input_layer_param->mutable_input_param();
+  
+  BlobShape* input_shape = NULL;
   for(int i = 0; i < input_size; i++) {
-    net_param.add_input(input_names[i]);
+    input_layer_param->add_top(input_names[i]);
+    input_shape = input_param->add_shape();
     for (int j = 0; j < bottom[i]->num_axes(); ++j) {
-      input_shape.add_dim(bottom[i]->shape(j));
+      input_shape->add_dim(bottom[i]->shape(j));
     }
-    net_param.add_input_shape()->CopyFrom(input_shape);
-    input_shape.Clear();  
   }
   
+  input_layer_param->add_top("cont");
+  input_shape = input_param->add_shape();
   for (int i = 0; i < bottom[input_size]->num_axes(); ++i) {
-    input_shape.add_dim(bottom[input_size]->shape(i));
+    input_shape->add_dim(bottom[input_size]->shape(i));
   }
-  net_param.add_input("cont");
-  net_param.add_input_shape()->CopyFrom(input_shape);
 
   if (static_input_) {
-    input_shape.Clear();
+    input_layer_param->add_top("x_static");
+    input_shape = input_param->add_shape();
     for (int i = 0; i < bottom[input_size + 1]->num_axes(); ++i) {
-      input_shape.add_dim(bottom[input_size + 1]->shape(i));
+      input_shape->add_dim(bottom[input_size + 1]->shape(i));
     }
-    net_param.add_input("x_static");
-    net_param.add_input_shape()->CopyFrom(input_shape);
   }
-
+  
+  vector<string> recur_input_names;
+  vector<BlobShape> recur_input_shapes;
+  RecurrentInputBlobNames(&recur_input_names);
+  RecurrentInputShapes(&recur_input_shapes);
+  
+  for(int i = 0; i < recur_input_names.size(); i++) {
+    input_layer_param->add_top(recur_input_names[i]);
+    input_param->add_shape()->CopyFrom(recur_input_shapes[i]);
+  }
+   
   // Call the child's FillUnrolledNet implementation to specify the unrolled
   // recurrent architecture.
   this->FillUnrolledNet(&net_param);
@@ -109,8 +123,8 @@ void RecurrentLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   }
 
   // Setup pointers to paired recurrent inputs/outputs.
-  vector<string> recur_input_names;
-  RecurrentInputBlobNames(&recur_input_names);
+  //vector<string> recur_input_names;
+  //RecurrentInputBlobNames(&recur_input_names);
   vector<string> recur_output_names;
   RecurrentOutputBlobNames(&recur_output_names);
   const int num_recur_blobs = recur_input_names.size();
@@ -253,7 +267,7 @@ void RecurrentLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     caffe_copy(count, timestep_T_data, timestep_0_data);
   }
 
-  unrolled_net_->ForwardPrefilled();
+  unrolled_net_->Forward();
   
   //Amirreza: I add this part here! 
   //In the ForwardPrefilled Reshape of every layers are called

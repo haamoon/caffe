@@ -383,11 +383,13 @@ template <typename Dtype>
   public:
     explicit RecurrentTrackerLayer(const LayerParameter& param)
         : RecurrentLayer<Dtype>(param) {}
-        
+    
+    virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+                            const vector<Blob<Dtype>*>& top);
     virtual inline const char* type() const { return "RecurrentTracker"; }
     virtual inline int MinBottomBlobs() const { return 3; }
     virtual inline int MaxBottomBlobs() const { return 3; }
-    virtual inline int ExactNumTopBlobs() const { return 1; }
+    virtual inline int ExactNumTopBlobs() const { return 3; }
   protected:
     virtual void FillUnrolledNet(NetParameter* net_param) const;
     virtual void RecurrentInputBlobNames(vector<string>* names) const;
@@ -395,6 +397,10 @@ template <typename Dtype>
     virtual void RecurrentInputShapes(vector<BlobShape>* shapes) const;
     virtual void OutputBlobNames(vector<string>* names) const;
     virtual void InputBlobNames(vector<string>* names) const;
+    
+    int max_ntrack_;
+    int max_nseg_;
+    int feature_dim_;
 };
 
 }  // namespace caffe

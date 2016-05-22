@@ -45,12 +45,12 @@ namespace caffe {
     vector<int> top_shape = bottom[4]->shape();
     
     // for N_ == 1 we can use actual seg_num value
-    if(N_ == 1 && *(bottom[4]->cpu_data()) > 0) {
-      int seg_num  = *(bottom[4]->cpu_data());
-      top_shape.push_back(seg_num);
-    } else {
-      top_shape.push_back(max_nrows_/nspatial_cell_);
-    }
+    //if(N_ == 1 && *(bottom[4]->cpu_data()) > 0) {
+    //  int seg_num  = *(bottom[4]->cpu_data());
+    //  top_shape.push_back(seg_num);
+    //} else {
+    top_shape.push_back(max_nrows_/nspatial_cell_);
+    //}
     
     top_shape.push_back(channels_ * nspatial_cell_);
     

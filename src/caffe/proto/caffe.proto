@@ -960,17 +960,17 @@ message RecurrentParameter {
 
 message RecurrentTrackerParameter {
   // Number of tracks in the video.
-  optional int32 max_ntrack = 1 [default = 1];
+  //required int32 max_ntrack = 1;
   
   // Input feature dimension.
-  required int32 feature_dim = 2;
+  //required int32 feature_dim = 2;
 
   // Lambda value in the inversion unit
-  optional float lambda = 3 [default = .5];
+  required float lambda = 3;
   
-  required int32 max_nseg = 4;
+  //required int32 max_nseg = 4;
 
-  optional float alpha = 5;
+  required float alpha = 5;
 }
 
 // Message that stores parameters used by ReductionLayer

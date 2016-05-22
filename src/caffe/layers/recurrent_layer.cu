@@ -27,7 +27,7 @@ void RecurrentLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
     caffe_copy(count, timestep_T_data, timestep_0_data);
   }
 
-  unrolled_net_->ForwardPrefilled();
+  unrolled_net_->Forward();
 }
 
 INSTANTIATE_LAYER_GPU_FORWARD(RecurrentLayer);
