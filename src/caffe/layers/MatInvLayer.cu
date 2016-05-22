@@ -37,7 +37,7 @@ void MatInvLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
  
    const Dtype* cont = NULL;
    if(bottom.size() > 1) {
-     cont = bottom[1]->gpu_data();
+     cont = bottom[1]->cpu_data();
    }
 
     Dtype* top_data = top[0]->mutable_gpu_data();
@@ -45,8 +45,8 @@ void MatInvLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
                 count, input_data, top_data, (Dtype) lambda_, NULL, offset_, dim_);
 
    for (int n = 0; n < N_; ++n) {
-     if (cont != NULL && cont[n] == 0) {
-       tracker_gpu_pos_inverse<Dtype>(dim_, top_data + offset_ * n);
+     if (cont == NULL || cont[n] == 0) {
+       tracker_gpu_inverse<Dtype>(dim_, top_data + offset_ * n);
      }
    }
 }
@@ -61,7 +61,7 @@ void MatInvLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
 
   const Dtype* cont = NULL;
    if(bottom.size() > 1) {
-     cont = bottom[1]->gpu_data();
+     cont = bottom[1]->cpu_data();
    }
 
   Dtype* input_diff = bottom[0]->mutable_gpu_diff();
@@ -71,7 +71,7 @@ void MatInvLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
 
 
   for (int n = 0; n < N_; ++n) {
-    if (cont != NULL && cont[n] == 0) {
+    if (cont == NULL || cont[n] == 0) {
       // A' = - B^\top B' B^\top
       caffe_gpu_gemm<Dtype>(CblasTrans, CblasNoTrans, dim_,
           dim_, dim_,

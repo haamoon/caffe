@@ -1,29 +1,28 @@
 name: "RecurrentTracker"
 
 ## bottom[0]: X is T x N x max_nseg x dim
-## bottom[1]: V is T x N x max_nseg x max_ntrack
+## bottom[1]: V is T x N x max_ntrack x max_nseg
 ## bottom[2]: cont is T x N
 
 input: "X"
-input_shape {
-  dim: 8
-  dim: 4
-  dim: 200
-  dim: 4096
-}
-
 input: "V"
-input_shape {
-  dim: 8
-  dim: 4
-  dim: 200
-  dim: 100
-}
-
 input: "cont"
+
 input_shape {
-  dim: 8
-  dim: 4
+  dim: 20
+  dim: 1
+  dim: 10
+  dim: 20
+}
+input_shape {
+  dim: 20
+  dim: 1
+  dim: 5
+  dim: 10
+}
+input_shape {
+  dim: 20
+  dim: 1
 }
 
 layer {
@@ -33,11 +32,10 @@ layer {
   bottom: "V"
   bottom: "cont"
   top: "Y"
+  top: "Wcont_0"
+  top: "Wcont_1"
   recurrent_tracker_param {
-    feature_dim: 4096
-    lambda: 0.5
-    alpha: 0.0001
-    max_nseg: 200
-    max_ntrack: 100
+    lambda: 1
+    alpha: 1
   }
 }

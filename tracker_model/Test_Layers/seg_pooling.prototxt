@@ -1,0 +1,61 @@
+name: "Transpose"
+
+## bottom[0]: in is a ... x channel_ x height_ x width_ conv feature matrix
+## bottom[1]: in is a ... x data_len_ 
+## bottom[2]: in is a ... x data_len_
+## bottom[3]: in is a ... x (max_nrows_ + 1)
+## bottom[4]: in is a ... 
+
+
+input: "in"
+input_shape {
+  dim: 3
+  dim: 2
+  dim: 512
+  dim: 20
+  dim: 10
+}
+force_backward: true
+
+
+input: "pooling_data"
+input_shape {
+  dim: 3
+  dim: 2
+  dim: 40000
+}
+
+input: "pooling_ind"
+input_shape {
+  dim: 3
+  dim: 2
+  dim: 40000
+}
+
+input: "pooling_ptr"
+input_shape {
+  dim: 3
+  dim: 2
+  dim: 6001
+}
+
+input: "seg_num"
+input_shape {
+  dim: 3
+  dim: 2
+}
+
+
+layer {
+  name: "seg_pooling"
+  type: "SegmentPooling"
+  bottom: "in"
+  bottom: "pooling_data"
+  bottom: "pooling_ind"
+  bottom: "pooling_ptr"
+  bottom: "seg_num"
+  segment_pooling_param {
+    num_spatial_cells: 6
+  }
+  top: "out"
+}

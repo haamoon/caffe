@@ -61,10 +61,9 @@ void MatInvLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     cont = bottom[1]->cpu_data();
   }
   caffe_copy(N_* offset_, input_data, output_data);
-  float lambda = lambda_;
   for (int n = 0; n < N_; ++n) {
-    if (cont != NULL && cont[n] == 0) {
-      tracker_strided_add_scalar<Dtype>(offset_, lambda, dim_ + 1, output_data + offset_ * n);
+    if (cont == NULL || cont[n] == 0) {
+      tracker_strided_add_scalar<Dtype>(offset_, lambda_, dim_ + 1, output_data + offset_ * n);
       tracker_cpu_inverse<Dtype>(dim_, output_data + offset_ * n);
     }
   }
@@ -89,7 +88,7 @@ void MatInvLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
   }
   
   for (int n = 0; n < N_; ++n) {
-    if (cont != NULL && cont[n] == 0) {
+    if (cont == NULL || cont[n] == 0) {
       // A' = - B^\top B' B^\top
       caffe_cpu_gemm<Dtype>(CblasTrans, CblasNoTrans, dim_,
                           dim_, dim_,
